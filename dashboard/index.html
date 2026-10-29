@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Job Agent Factory</title>
+<style>
+:root{--bg:#0b1220;--panel:rgba(16,24,40,.88);--line:rgba(255,255,255,.12);--text:#e8edf5;--muted:#9aa7bb;--teal:#1D9E75;--purple:#7F77DD;--amber:#EF9F27;--pink:#D4537E;--coral:#D85A30;--gray:#888780}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+canvas.drag{cursor:grabbing}canvas.hit{cursor:pointer}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(6px)}
+#top{position:fixed;left:16px;top:14px;display:flex;flex-direction:column;gap:8px;max-width:calc(100% - 400px)}
+#top h1{margin:0;font-size:18px;font-weight:600;letter-spacing:.2px}
+#top .sub{color:var(--muted);font-size:12px;margin-top:2px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+button,select,input{font:inherit;color:var(--text);background:rgba(255,255,255,.07);border:1px solid var(--line);border-radius:8px;padding:6px 11px}
+button{cursor:pointer}button:hover{background:rgba(255,255,255,.14)}
+button.on{background:rgba(29,158,117,.28);border-color:var(--teal)}
+button.primary{background:rgba(29,158,117,.3);border-color:var(--teal)}
+select option{color:#111}
+#status{font-size:12px;padding:3px 10px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+#status.ok{color:#7fe3bd;border-color:var(--teal)}#status.bad{color:#f0997b;border-color:var(--coral)}
+#side{position:fixed;right:14px;top:14px;bottom:160px;width:360px;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+#side>.panel{pointer-events:auto;padding:12px 14px}
+#card h2{margin:0 0 2px;font-size:16px;font-weight:600}
+#card .role{color:var(--muted);font-size:13px;margin-bottom:8px}
+#card h3{margin:8px 0 3px;font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:600}
+#card ul{margin:0;padding-left:18px;font-size:13px}#card li{margin:1px 0}
+#card .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+#card .last{font-size:12px;color:var(--muted);margin-top:8px}
+#result{display:none}#result.show{display:block}
+#result h2{margin:0 0 4px;font-size:14px;font-weight:600}
+#result .score{font-size:26px;font-weight:600}
+#result .note{font-size:11px;color:var(--muted);margin-top:6px}
+#result ul{margin:2px 0 0;padding-left:18px;font-size:13px}
+#feedwrap{flex:1;min-height:110px;display:flex;flex-direction:column;overflow:hidden}
+#feedwrap h3{margin:0 0 6px;font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;justify-content:space-between}
+#feed{flex:1;overflow-y:auto;font-size:12.5px}
+#feed div{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.06);display:flex;gap:6px}
+#feed .tm{color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
+#feed .d{flex:none;width:9px;height:9px;border-radius:50%;margin-top:5px}
+#raw{display:none;font:11px/1.35 ui-monospace,Menlo,monospace;color:var(--muted);max-height:96px;overflow:auto;margin-top:6px;white-space:pre-wrap;word-break:break-all}
+#bottom{position:fixed;left:14px;right:14px;bottom:12px;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+#caption{pointer-events:none;max-width:760px;text-align:center;padding:7px 16px;font-size:14px;min-height:34px}
+#bar{pointer-events:auto;display:flex;gap:12px;flex-wrap:wrap;justify-content:center;padding:8px 12px}
+#bar .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#bar .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+#jobin{width:230px}
+#err{display:none;color:#f0997b;font-size:12px}
+@media(max-width:900px){#side{width:290px;bottom:150px}#top{max-width:calc(100% - 320px)}}
+@media(max-width:700px){#side{display:none}#top{max-width:100%}}
+</style>
+</head>
+<body>
+<canvas id="cv" aria-label="3D conveyor-belt factory showing the job agents workflow"></canvas>
+
+<div id="top">
+  <div><h1>Job Agent Factory</h1><div class="sub">Drag to orbit, scroll to zoom, shift-drag to pan, click a station for details</div></div>
+  <div class="row">
+    <button id="mDemo" class="on">Demo</button><button id="mLive">Live</button>
+    <span id="status">demo mode</span>
+  </div>
+  <div class="row" id="liveTools" style="display:none">
+    <button id="btnTest">Send test run</button><button id="btnClear">Clear log</button><button id="btnRaw">Raw events</button>
+  </div>
+  <div id="err"></div>
+</div>
+
+<div id="side">
+  <div class="panel" id="card"></div>
+  <div class="panel" id="result"></div>
+  <div class="panel" id="feedwrap"><h3><span>Activity</span><span id="evcount"></span></h3><div id="feed"></div><div id="raw"></div></div>
+</div>
+
+<div id="bottom">
+  <div class="panel" id="caption">Press Play to watch a job move through the factory.</div>
+  <div class="panel" id="bar">
+    <div class="grp" id="demoCtl">
+      <button id="bPlay" class="primary">Play</button><button id="bStep">Step</button><button id="bRestart">Restart</button>
+      <select id="speed" aria-label="Speed"><option value="0.6">0.6x</option><option value="1" selected>1x</option><option value="1.8">1.8x</option><option value="3">3x</option></select>
+      <select id="sample" aria-label="Sample job"><option value="a">Sample: Applied AI Researcher</option><option value="b">Sample: Director, Data Analytics</option></select>
+    </div>
+    <div class="grp">
+      <span class="lbl">Try a job</span>
+      <input id="jobin" placeholder="e.g. Senior MLOps Engineer, AWS" aria-label="Job title or keywords">
+      <button id="bTry">Run it</button>
+    </div>
+    <div class="grp">
+      <span class="lbl">Camera</span>
+      <button data-cam="overview">Overview</button><button data-cam="job-scout">Scout</button><button data-cam="gap-coach">Gap</button><button data-cam="application-tailor">Tailor</button><button data-cam="recruiter-reviewer">Reviewer</button>
+      <label style="display:flex;gap:5px;align-items:center;font-size:12px;color:var(--muted)"><input type="checkbox" id="follow" style="padding:0"> follow</label>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---------- data ---------- */
+const COL={teal:'#1D9E75',purple:'#7F77DD',amber:'#EF9F27',pink:'#D4537E',coral:'#D85A30',gray:'#888780'};
+const ST=[
+ {id:'intake',x:-15,kind:'src',color:COL.gray,name:'Job boards',tag:'new postings'},
+ {id:'job-scout',x:-10,kind:'agent',color:COL.teal,name:'job-scout',tag:'finds and scores'},
+ {id:'pick',x:-5,kind:'human',color:COL.coral,name:'You: pick',tag:'choose a job'},
+ {id:'gap-coach',x:0,kind:'agent',color:COL.purple,name:'gap-coach',tag:'fit and gaps'},
+ {id:'application-tailor',x:5,kind:'agent',color:COL.amber,name:'application-tailor',tag:'folder, CV, letter'},
+ {id:'recruiter-reviewer',x:10,kind:'agent',color:COL.pink,name:'recruiter-reviewer',tag:'review, fact check'},
+ {id:'outbox',x:15,kind:'human',color:COL.coral,name:'You: send',tag:'decide and submit'}
+];
+const BY={};ST.forEach(s=>{BY[s.id]=s;s.glow=0;s.act=0;s.bubble='';s.bubT=0;s.last='';s.lastT=0});
+const INFO={
+ 'intake':{role:'Where new postings enter. Employer career pages and job boards.',tools:['WebSearch','WebFetch'],does:['Postings are collected by the scout, not by this stage'],rules:['Only roles in scope for PROFILE.md']},
+ 'job-scout':{role:'Finds and scores current vacancies.',tools:['Read','Glob','Grep','Write','WebSearch','WebFetch'],does:['Opens each primary job page, checks it is still open','Separates essential from desirable requirements','Scores fit 1-5 against the evidence bank','Flags degree-status issues','Duplicate check against every Applications folder and the tracker (app_tools.py check)','Writes the shortlist and a Build queue of new jobs only'],rules:['Never invents a vacancy, date or requirement','Creates no folders itself: the tailor builds from the queue','Duplicates are dropped; possible repeats wait for your decision']},
+ 'pick':{role:'You choose which job is worth an application.',tools:['Your judgement'],does:['Read the ranked shortlist','Pick one role and run /prepare-application'],rules:['Nothing proceeds without your choice']},
+ 'gap-coach':{role:'Reads the job description and tells you what matches and what is missing.',tools:['Read','Glob','Grep','WebSearch','WebFetch'],does:['Top requirements and keywords','Match table with evidence and limits','Fit score and apply / hold / skip advice','Honest actions: evidence to dig out, small projects, courses, eligibility questions','Likely interview questions on the gaps'],rules:['Never suggests claiming something not done','A skip is a good result when a mandatory condition cannot be met']},
+ 'application-tailor':{role:'Builds one application pack for the chosen job.',tools:['Read','Write','Edit','Bash','Glob','Grep','WebSearch','WebFetch'],does:['Re-checks for a duplicate, then creates the next numbered folder in applications/ (app_tools.py new-folder)','Writes Job_Requirements.md with the URL and job ID','Builds a tailored CV and cover letter from the master CV','Builds the documents and inspects the pages','In a sweep, works through the Build queue one job at a time'],rules:['No invented numbers, tools or courses','Does not send, submit or edit the tracker']},
+ 'recruiter-reviewer':{role:'Reviews the finished files as a busy recruiter, then fact-checks them.',tools:['Read','Glob','Grep','Bash'],does:['Six-second scan and score out of 10','Line-by-line check of letter and CV','Traces every claim to the evidence bank','Lists must-fix items and facts you must confirm'],rules:['Recommends changes only; does not edit files']},
+ 'outbox':{role:'You review, confirm the facts and submit.',tools:['Your judgement'],does:['Check referees, dates and gap statements','Save the exact upload files','Send the application yourself'],rules:['Agents never submit or email']}
+};
+let selected='job-scout';
+
+/* ---------- 3D engine (no libraries) ---------- */
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+let W=0,H=0,DPR=1;
+function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=cv.clientWidth;H=cv.clientHeight;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);ctx.setTransform(DPR,0,0,DPR,0,0)}
+addEventListener('resize',resize);resize();
+const cam={th:0.42,ph:1.0,r:36,tx:0,ty:1,tz:0};
+const goal={th:0.42,ph:1.0,r:36,tx:0,ty:1,tz:0};
+let VX=0;
+let C={px:0,py:0,pz:0,rx:0,ry:0,rz:0,ux:0,uy:0,uz:0,fx:0,fy:0,fz:0,foc:900};
+function setupCam(){
+ const sp=Math.sin(cam.ph),cp=Math.cos(cam.ph);
+ C.px=cam.tx+cam.r*sp*Math.sin(cam.th);C.py=cam.ty+cam.r*cp;C.pz=cam.tz+cam.r*sp*Math.cos(cam.th);
+ let fx=cam.tx-C.px,fy=cam.ty-C.py,fz=cam.tz-C.pz;const fl=Math.hypot(fx,fy,fz);fx/=fl;fy/=fl;fz/=fl;
+ let rx=-fz,ry=0,rz=fx;const rl=Math.hypot(rx,rz);rx/=rl;rz/=rl;
+ const ux=ry*fz-rz*fy,uy=rz*fx-rx*fz,uz=rx*fy-ry*fx;
+ C.rx=rx;C.ry=ry;C.rz=rz;C.ux=ux;C.uy=uy;C.uz=uz;C.fx=fx;C.fy=fy;C.fz=fz;VX=W>900?(W-390)/2:W/2;C.foc=Math.min(H*1.15,VX*1.9);
+}
+function P(x,y,z){
+ const dx=x-C.px,dy=y-C.py,dz=z-C.pz;
+ const cz=dx*C.fx+dy*C.fy+dz*C.fz;if(cz<0.4)return null;
+ const cx=dx*C.rx+dy*C.ry+dz*C.rz,cy=dx*C.ux+dy*C.uy+dz*C.uz;const s=C.foc/cz;
+ return{x:VX+cx*s,y:H*0.5-cy*s,z:cz,s:s};
+}
+function hex(h){const n=parseInt(h.slice(1),16);return[(n>>16)&255,(n>>8)&255,n&255]}
+const BGc=[11,18,32];
+const LIGHT=(()=>{const l=[-0.45,0.85,0.55],n=Math.hypot(...l);return l.map(v=>v/n)})();
+function shade(rgb,k,em,z){
+ let r=rgb[0]*k+255*em*0.35,g=rgb[1]*k+255*em*0.35,b=rgb[2]*k+255*em*0.35;
+ if(em>0){r=Math.min(255,r+rgb[0]*em*0.6);g=Math.min(255,g+rgb[1]*em*0.6);b=Math.min(255,b+rgb[2]*em*0.6)}
+ const f=Math.max(0,Math.min(0.6,(z-34)/90));
+ r=r+(BGc[0]-r)*f;g=g+(BGc[1]-g)*f;b=b+(BGc[2]-b)*f;
+ return'rgb('+(r|0)+','+(g|0)+','+(b|0)+')';
+}
+const FACES=[[[0,3,2,1],[0,0,-1]],[[4,5,6,7],[0,0,1]],[[3,7,6,2],[0,1,0]],[[0,4,7,3],[-1,0,0]],[[1,2,6,5],[1,0,0]]];
+let list=[];
+function rotv(v,rt){
+ if(!rt)return v;let[x,y,z]=v;
+ if(rt.pv){x-=rt.pv[0];y-=rt.pv[1];z-=rt.pv[2]}
+ if(rt.rx){const c=Math.cos(rt.rx),s=Math.sin(rt.rx);const ny=y*c-z*s,nz=y*s+z*c;y=ny;z=nz}
+ if(rt.ry){const c=Math.cos(rt.ry),s=Math.sin(rt.ry);const nx=x*c+z*s,nz=-x*s+z*c;x=nx;z=nz}
+ if(rt.pv){x+=rt.pv[0];y+=rt.pv[1];z+=rt.pv[2]}
+ return[x,y,z];
+}
+function box(cx,cy,cz,sx,sy,sz,col,o){
+ o=o||{};const rgb=typeof col==='string'?hex(col):col;const em=o.em||0;if(o.bias==null&&sz<=.05&&!o.rot)o.bias=.5;
+ const hx=sx/2,hy=sy/2,hz=sz/2;
+ const V=[[-hx,-hy,-hz],[hx,-hy,-hz],[hx,hy,-hz],[-hx,hy,-hz],[-hx,-hy,hz],[hx,-hy,hz],[hx,hy,hz],[-hx,hy,hz]].map(v=>rotv([v[0]+cx,v[1]+cy,v[2]+cz],o.rot));
+ for(const f of FACES){
+  const n=rotv(f[1],o.rot&&{rx:o.rot.rx,ry:o.rot.ry});
+  const idx=f[0];let mx=0,my=0,mz=0;for(const i of idx){mx+=V[i][0];my+=V[i][1];mz+=V[i][2]}mx/=4;my/=4;mz/=4;
+  if(n[0]*(C.px-mx)+n[1]*(C.py-my)+n[2]*(C.pz-mz)<=0)continue;
+  const pts=[];let zs=0,ok=true;
+  for(const i of idx){const p=P(V[i][0],V[i][1],V[i][2]);if(!p){ok=false;break}pts.push(p);zs+=p.z}
+  if(!ok)continue;
+  const k=0.42+0.58*Math.max(0,n[0]*LIGHT[0]+n[1]*LIGHT[1]+n[2]*LIGHT[2]);
+  list.push({t:0,pts,z:zs/4-(o.bias||0),fill:shade(rgb,k,em,zs/4),a:o.a==null?1:o.a});
+ }
+}
+function ball(x,y,z,r,col,em){
+ const p=P(x,y,z);if(!p)return;const rgb=typeof col==='string'?hex(col):col;
+ list.push({t:1,x:p.x,y:p.y,rr:r*p.s,z:p.z-r*0.5,rgb,em:em||0,zz:p.z});
+}
+function drawList(){
+ list.sort((a,b)=>b.z-a.z);
+ for(const f of list){
+  if(f.t===0){
+   ctx.globalAlpha=f.a;ctx.beginPath();ctx.moveTo(f.pts[0].x,f.pts[0].y);
+   for(let i=1;i<f.pts.length;i++)ctx.lineTo(f.pts[i].x,f.pts[i].y);ctx.closePath();
+   ctx.fillStyle=f.fill;ctx.fill();ctx.strokeStyle='rgba(0,0,0,.38)';ctx.lineWidth=.8;ctx.stroke();ctx.globalAlpha=1;
+  }else{
+   const g=ctx.createRadialGradient(f.x-f.rr*.3,f.y-f.rr*.3,f.rr*.1,f.x,f.y,f.rr);
+   g.addColorStop(0,shade(f.rgb,1.25,f.em,f.zz));g.addColorStop(1,shade(f.rgb,.55,f.em,f.zz));
+   ctx.fillStyle=g;ctx.beginPath();ctx.arc(f.x,f.y,Math.max(1,f.rr),0,6.2832);ctx.fill();
+  }
+ }
+}
+function line3(a,b,col,w){const p=P(a[0],a[1],a[2]),q=P(b[0],b[1],b[2]);if(!p||!q)return;ctx.strokeStyle=col;ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke()}
+function drawFloor(t){
+ const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#0b1220');g.addColorStop(1,'#121c30');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ for(let x=-32;x<=32;x+=4)line3([x,0,-14],[x,0,16],'rgba(150,170,200,.11)',1);
+ for(let z=-14;z<=16;z+=4)line3([-32,0,z],[32,0,z],'rgba(150,170,200,.11)',1);
+ for(const s of ST){
+  const pts=[];for(let i=0;i<=28;i++){const a=i/28*6.2832;const p=P(s.x+Math.cos(a)*2.5,0.01,-2.5+Math.sin(a)*2.0);if(!p)return;pts.push(p)}
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(const p of pts)ctx.lineTo(p.x,p.y);ctx.closePath();
+  const rgb=hex(s.color);ctx.fillStyle='rgba('+rgb+','+(0.05+0.2*s.glow)+')';ctx.fill();
+  ctx.strokeStyle='rgba('+rgb+','+(0.25+0.6*s.glow)+')';ctx.lineWidth=1.5;ctx.stroke();
+ }
+}
+
+/* ---------- work item (crate) ---------- */
+const crate={x:-15,tx:-15,y:0.6,z:0,vis:false,type:'job',label:'',mode:'belt',vy:0,vz:0,t0:0};
+function crateSet(type,label){crate.type=type;crate.label=label||'';crate.vis=true}
+function crateTo(id){const s=BY[id];crate.tx=s.x;if(!crate.vis)crate.x=s.x;crate.vis=true;crate.mode='belt';crate.z=0;crate.y=0.6}
+function crateDrop(){crate.mode='drop';crate.vy=3.2;crate.vz=3.1;crate.t0=now()}
+function crateHide(){crate.vis=false}
+function suitcase(x,y,z,col,w,h,d,em){
+ w=w||.8;h=h||.7;d=d||.46;
+ box(x,y+.1+h/2,z,w,h,d,col,{em:em||0});
+ box(x,y+.1+h/2,z+d/2+.01,w+.03,.09,.03,'#ffffff',{bias:.05});
+ box(x,y+.1+h+.06,z,.32,.1,.07,'#2a2f3c');box(x-.16,y+.1+h+.02,z,.05,.08,.07,'#2a2f3c');box(x+.16,y+.1+h+.02,z,.05,.08,.07,'#2a2f3c');
+ box(x-w/2+.1,y+.05,z+d/2-.08,.1,.1,.1,'#1a1a22');box(x+w/2-.1,y+.05,z+d/2-.08,.1,.1,.1,'#1a1a22');
+ box(x+w/2+.03,y+.1+h*.6,z+.05,.05,.24,.12,'#fdf6e6');
+}
+function drawCrate(t){
+ if(!crate.vis)return;const x=crate.x,z=crate.z,b=crate.y;
+ const bob=crate.mode==='belt'?Math.sin(t*3)*0.02:0;const y=b+bob-.1;
+ if(crate.type==='batch'){
+  suitcase(x-.3,y,z-.12,'#6b7280',.78,.62);suitcase(x+.32,y,z+.1,COL.teal,.7,.56);suitcase(x-.02,y+.78,z,'#9aa7bb',.7,.5);
+ }else if(crate.type==='shortlist'){
+  box(x,y+.18,z,1.35,.14,1.05,'#e8edf5');for(let i=0;i<3;i++)box(x,y+.27,z-.28+i*.28,1.0,.03,.1,COL.teal,{em:.5});
+ }else if(crate.type==='job'){
+  suitcase(x,y,z,COL.amber,.95,.8,.55);
+ }else if(crate.type==='pack'){
+  box(x,y+.19,z,1.25,.16,.9,COL.amber);box(x-.45,y+.32,z-.4,.4,.1,.12,'#f6c978');
+  box(x,y+.3,z,1.05,.04,.75,'#fdf6e6');box(x+.04,y+.34,z+.03,1.05,.04,.75,'#ffffff');
+ }else{
+  suitcase(x,y,z,COL.teal,.9,.7,.5,.3);
+ }
+}
+
+/* ---------- stations: airport counters with pixel staff ---------- */
+const SZ=-3.0; /* staff stand z, behind the counter */
+const LOOK={
+ 'job-scout':{skin:'#f2c9a6',hair:'#3b2a20',style:'short',scarf:'#ffffff'},
+ 'gap-coach':{skin:'#c68a5e',hair:'#1b1b2a',style:'bun',scarf:'#f6e7a8'},
+ 'application-tailor':{skin:'#8d5a3b',hair:'#24150e',style:'pony',scarf:'#ffffff'},
+ 'recruiter-reviewer':{skin:'#f5d3b8',hair:'#b5651d',style:'bob',scarf:'#f6e7a8',glasses:true},
+ 'pick':{skin:'#e8b894',hair:'#5a3a1e',style:'short',scarf:'#ffffff',boss:true},
+ 'outbox':{skin:'#d9a57d',hair:'#2a2a2e',style:'short',scarf:'#ffffff',boss:true}
+};
+function darker(h,k){const c=hex(h);return[(c[0]*k)|0,(c[1]*k)|0,(c[2]*k)|0]}
+function drawStaff(s,t){
+ const L=LOOK[s.id];if(!L)return;
+ const X=s.x,g=s.glow,rgb=hex(s.color),uni=rgb,dark=darker(s.color,.62),sz=SZ;
+ const act=g>0.15;
+ const bob=act?Math.round(Math.sin(t*7))*0.04:(Math.floor(t*1.1)%2)*0.025;
+ const HY=2.15+bob;
+ /* legs (hidden by the counter, visible when orbiting) */
+ box(X-.22,.4,sz,.3,.8,.32,'#1d2538');box(X+.22,.4,sz,.3,.8,.32,'#1d2538');
+ /* torso, shirt, tie, badge */
+ box(X,1.2,sz,.98,.92,.58,uni,{em:.05+.25*g});
+ box(X,1.45,sz+.3,.34,.34,.03,'#ffffff');
+ box(X,1.3,sz+.31,.11,.42,.03,dark);
+ box(X-.3,1.42,sz+.3,.05,.5,.02,'#e8c34a');
+ box(X+.3,1.32,sz+.3,.24,.3,.03,'#ffffff');box(X+.3,1.4,sz+.32,.2,.07,.02,rgb);
+ box(X,1.7,sz,.6,.14,.52,hex(L.scarf));
+ for(const sx of[-1,1])box(X+sx*.52,1.66,sz,.2,.08,.38,L.boss?'#e8c34a':'#ffffff');
+ /* head */
+ box(X,HY,sz,.96,.96,.86,L.skin);
+ for(const sx of[-1,1])box(X+sx*.51,HY-.02,sz,.08,.22,.18,L.skin);
+ /* hair by style, cap on top */
+ const hair=L.hair,fz=sz+.44;
+ if(L.style==='bob'){box(X,HY+.05,sz-.39,1.04,.96,.2,hair);for(const sx of[-1,1])box(X+sx*.5,HY-.05,sz-.05,.12,.7,.7,hair)}
+ else box(X,HY+.05,sz-.39,1.0,.86,.16,hair);
+ if(L.style==='bun')box(X,HY+.78,sz-.2,.34,.3,.34,hair);
+ if(L.style==='pony'){box(X+.05,HY-.1,sz-.58,.26,.7,.2,hair);box(X+.05,HY+.25,sz-.5,.3,.12,.22,'#ffffff')}
+ box(X,HY+.38,fz-.02,.98,.16,.1,hair);
+ box(X-.3,HY+.28,fz-.02,.34,.14,.1,hair);
+ /* cap */
+ box(X,HY+.58,sz,1.04,.26,.94,rgb,{em:.08+.3*g});
+ box(X,HY+.47,sz+.62,.98,.07,.42,dark);
+ box(X,HY+.6,sz+.5,.26,.16,.04,'#f1d36b',{em:.2});
+ /* face pixels */
+ const blink=(t*0.8)%5<0.14;const eh=blink?.04:.2;
+ for(const sx of[-1,1]){
+  box(X+sx*.22,HY+.02,fz,.14,eh,.03,'#1a1a24');
+  if(!blink)box(X+sx*.22+.03,HY+.08,fz+.02,.05,.06,.02,'#ffffff');
+  box(X+sx*.34,HY-.17,fz,.15,.09,.03,'#f08a8a');
+ }
+ if(L.glasses){for(const sx of[-1,1])box(X+sx*.22,HY+.02,fz+.03,.32,.27,.02,'#9ad7ff',{a:.4});box(X,HY+.04,fz+.03,.1,.04,.02,'#222a3a')}
+ if(act&&Math.sin(t*9)>0){box(X,HY-.22,fz,.15,.12,.03,'#3a1018')}
+ else{box(X,HY-.22,fz,.15,.05,.03,'#7a3a3a');box(X-.12,HY-.19,fz,.05,.05,.03,'#7a3a3a');box(X+.12,HY-.19,fz,.05,.05,.03,'#7a3a3a')}
+ /* headset */
+ if(!L.boss){
+  box(X-.54,HY,sz,.1,.3,.24,'#222a3a');box(X,HY+.52,sz,.04,.04,.04,'#222a3a');
+  box(X-.52,HY-.22,sz+.25,.05,.05,.5,'#222a3a');box(X-.5,HY-.22,fz-.02,.1,.07,.06,rgb,{em:.25+.9*g});
+ }
+ /* arms: typing on the counter, or waving for the human stations */
+ const shY=1.58;
+ let aR=-1.12,aL=-1.12;
+ if(L.boss){aR=act?-2.7+Math.sin(t*6)*.45:-0.15;aL=-0.15}
+ else if(act){aR=-1.12+Math.sin(t*11)*.1;aL=-1.12+Math.sin(t*11+2)*.1}
+ for(const sx of[-1,1]){
+  const rx=sx>0?aR:aL,px=X+sx*.62;
+  box(px,shY-.28,sz,.26,.56,.28,uni,{rot:{pv:[px,shY,sz],rx},em:.05+.2*g});
+  box(px,shY-.64,sz,.22,.16,.24,L.skin,{rot:{pv:[px,shY,sz],rx}});
+ }
+}
+function drawCounter(s,t){
+ const X=s.x,rgb=hex(s.color),g=s.glow,cz=-2.0;
+ /* back wall flight board */
+ box(X,2.2,-4.3,3.4,2.6,.28,'#232c3d');
+ for(let r=0;r<4;r++){
+  const w=1.0+((r*7+s.x*3)%5+5)%5*.28;const lit=(Math.floor(t*0.8+r*1.3+s.x)%3)!==0;
+  box(X-1.4+w/2,3.0-r*.4,-4.13,w,.16,.03,rgb,{em:lit?.25+.7*g:.05});
+  box(X+1.2,3.0-r*.4,-4.13,.3,.16,.03,'#e8edf5',{em:lit?.2:0});
+ }
+ /* counter: cabinet, coloured front, worktop */
+ box(X,.55,cz,3.1,1.1,1.0,'#dfe5ef');
+ box(X,.55,cz+.52,2.7,.72,.05,rgb,{em:.1+.7*g});
+ box(X,.08,cz+.5,3.1,.16,1.04,'#39445f');
+ box(X,1.15,cz,3.3,.12,1.2,'#39445f');
+ /* pixel plane logo */
+ box(X-.45,.55,cz+.56,.9,.1,.03,'#ffffff');box(X-.25,.55,cz+.56,.16,.52,.03,'#ffffff');box(X-.82,.55,cz+.56,.1,.26,.03,'#ffffff');box(X+.04,.55,cz+.56,.12,.12,.03,'#ffffff');
+ /* monitor, keyboard, printer, scale */
+ const on=s.kind!=='src'||g>0.1;
+ box(X+1.05,1.22,cz+.3,.12,.18,.12,'#2a3243');
+ box(X+1.05,1.65,cz+.3,.9,.62,.08,'#10192b');
+ box(X+1.05,1.65,cz+.35,.78,.5,.03,rgb,{em:on?.3+.8*g:.08});
+ box(X+1.05,1.72,cz+.37,.5,.05,.02,'#ffffff',{em:.5});box(X+1.05,1.58,cz+.37,.34,.05,.02,'#ffffff',{em:.5});
+ box(X+.1,1.24,cz+.3,.8,.06,.28,'#2a3243');
+ box(X-1.05,1.3,cz+.05,.5,.2,.4,'#2a3243');box(X-1.05,1.42,cz+.28,.3,.03,.18,'#fdf6e6');
+ box(X-.6,1.23,cz+.35,.5,.04,.3,'#4a5675');
+ /* hanging sign gantry behind the counter */
+ for(const sx of[-1,1])box(X+sx*1.7,2.2,-3.85,.16,4.4,.16,'#3a4560');
+ box(X,4.4,-3.85,3.6,.16,.16,'#3a4560');
+ for(const sx of[-1,1])box(X+sx*1.2,4.05,-3.4,.05,.6,.05,'#8a96b0');
+ box(X,3.5,-3.4,3.0,.72,.16,rgb,{em:.25+.7*g});
+ box(X,3.5,-3.31,2.7,.5,.03,'#0b1220',{em:0});
+ /* pixel plane + text bars on the sign */
+ box(X-.9,3.5,-3.29,.5,.1,.02,'#ffffff',{em:.6});box(X-.9,3.5,-3.29,.1,.34,.02,'#ffffff',{em:.6});box(X-1.1,3.5,-3.29,.1,.2,.02,'#ffffff',{em:.6});
+ box(X+.2,3.58,-3.29,1.1,.1,.02,'#ffffff',{em:.6});box(X+.05,3.4,-3.29,.8,.08,.02,rgb,{em:.7+.6*g});
+}
+function drawStation(s,t){
+ const X=s.x,g=s.glow;
+ drawCounter(s,t);
+ if(s.kind==='src'){
+  for(const sx of[-1,1])for(const sz2 of[-1,1])box(X+sx*1,1.9,sz2*1,.18,2.0,.18,'#3a4560');
+  box(X,2.95,0,2.4,.18,2.4,'#4a5675');
+  for(let i=0;i<4;i++){const a=t*0.6+i*1.57,yy=3.7+Math.sin(t*1.2+i)*0.15;box(X+Math.cos(a)*1.0,yy,Math.sin(a)*1.0,.55,.04,.7,'#e8edf5',{rot:{rx:0,ry:a,pv:[X+Math.cos(a)*1.0,yy,Math.sin(a)*1.0]}})}
+  ball(X,4.35,0,.22,s.color,.3+.6*g);
+ }else drawStaff(s,t);
+ if(s.id==='outbox'){
+  const up=g>0.1||(crate.vis&&Math.abs(crate.x-X)<1.2);
+  box(X+1.9,1.9,.9,.08,.9,.08,'#e8edf5');box(X+2.15,up?2.3:1.7,.9,.5,.3,.05,COL.coral,{em:.4});
+ }
+}
+function drawBelt(t){
+ for(let x=-18;x<18;x+=2){
+  box(x+1,.45,0,2,.3,2.2,'#2a3243');
+  box(x+1,.62,-1.2,2,.3,.14,'#3d4863');box(x+1,.62,1.2,2,.3,.14,'#3d4863');
+ }
+ for(let x=-16;x<=16;x+=4){box(x,.22,-1.1,.2,.44,.2,'#222a3a');box(x,.22,1.1,.2,.44,.2,'#222a3a')}
+ for(let i=0;i<26;i++){const sx=((i*1.45+beltOff)%36)-18;box(sx,.62,0,.1,.03,1.9,'#46526b')}
+}
+function drawBin(t){
+ const X=BY['gap-coach'].x,Z=4.9;
+ box(X,.45,Z,1.8,.9,1.4,'#2a3243');box(X,.95,Z-.68,1.8,.12,.1,'#3d4863');box(X,.95,Z+.68,1.8,.12,.1,'#3d4863');
+ box(X-.9,.95,Z,.1,.12,1.4,'#3d4863');box(X+.9,.95,Z,.1,.12,1.4,'#3d4863');
+}
+
+/* ---------- labels ---------- */
+const hits=[];
+function pill(x,y,text,o){
+ o=o||{};ctx.font=(o.bold?'600 ':'400 ')+(o.size||12)+'px system-ui,sans-serif';
+ const w=ctx.measureText(text).width+16,h=(o.size||12)+10;
+ ctx.fillStyle=o.bg||'rgba(11,18,32,.82)';ctx.strokeStyle=o.line||'rgba(255,255,255,.18)';ctx.lineWidth=1;
+ const r=h/2,x0=x-w/2,y0=y-h/2;ctx.beginPath();ctx.moveTo(x0+r,y0);ctx.arcTo(x0+w,y0,x0+w,y0+h,r);ctx.arcTo(x0+w,y0+h,x0,y0+h,r);ctx.arcTo(x0,y0+h,x0,y0,r);ctx.arcTo(x0,y0,x0+w,y0,r);ctx.closePath();ctx.fill();ctx.stroke();
+ ctx.fillStyle=o.fg||'#e8edf5';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,x,y+0.5);
+}
+function drawLabels(t){
+ hits.length=0;
+ for(const s of ST){
+  const p=P(s.x,2.3,-2.4);if(!p)continue;
+  const sc=Math.max(.7,Math.min(1.25,p.s/28));
+  const nm=P(s.x,5.3,-3.4),bb=P(s.x,6.6,-3.4);
+  if(nm)pill(nm.x,nm.y,s.name,{bold:true,size:Math.round(12*sc),line:s.color,fg:'#fff'});
+  if(nm&&p.s>16){ctx.font='400 '+Math.round(11*sc)+'px system-ui,sans-serif';ctx.fillStyle='#9aa7bb';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(s.tag,nm.x,nm.y+24*sc)}
+  if(s.bubT>now()&&bb)pill(bb.x,bb.y-4,s.bubble,{size:Math.round(12*sc),bg:'rgba(255,255,255,.95)',fg:'#10192b',line:s.color});
+  hits.push({id:s.id,x:p.x,y:p.y,r:Math.max(26,p.s*2.1),z:p.z});
+  if(s.id===selected){ctx.strokeStyle=s.color;ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.beginPath();ctx.arc(p.x,p.y,Math.max(30,p.s*2.3),0,6.2832);ctx.stroke();ctx.setLineDash([])}
+  if(s.glow>0.05){const l=s.kind==='src'?P(s.x,4.35,0):P(s.x,3.5,-3.2);if(l){const rr=(28+18*Math.sin(t*5))*l.s/30*s.glow+10;const gr=ctx.createRadialGradient(l.x,l.y,0,l.x,l.y,rr);const rgb=hex(s.color);gr.addColorStop(0,'rgba('+rgb+',.65)');gr.addColorStop(1,'rgba('+rgb+',0)');ctx.fillStyle=gr;ctx.beginPath();ctx.arc(l.x,l.y,rr,0,6.2832);ctx.fill()}}
+ }
+ if(crate.vis&&crate.label){const q=P(crate.x,crate.y+1.7,crate.z);if(q)pill(q.x,q.y,crate.label,{size:11,bg:'rgba(239,159,39,.18)',line:COL.amber})}
+}
+
+/* ---------- state helpers ---------- */
+const now=()=>performance.now()/1000;
+let beltOff=0,beltSpd=0,running=false;
+function setAct(ids,text,ttl){
+ for(const s of ST){s.act=ids.includes(s.id)?1:0;if(!s.act&&s.bubT>now())s.bubT=0}
+ if(text)for(const id of ids){BY[id].bubble=text;BY[id].bubT=now()+(ttl||5)}
+ if(ids.length)selectedFollow(ids[0]);
+}
+function bubble(id,text,ttl){const s=BY[id];if(!s)return;s.bubble=text;s.bubT=now()+(ttl||4)}
+const feedEl=document.getElementById('feed');
+function feed(text,color){
+ const d=document.createElement('div');const tm=new Date().toTimeString().slice(0,8);
+ d.innerHTML='<span class="tm">'+tm+'</span><span class="d" style="background:'+(color||COL.gray)+'"></span><span></span>';
+ d.lastChild.textContent=text;feedEl.appendChild(d);while(feedEl.children.length>200)feedEl.removeChild(feedEl.firstChild);feedEl.scrollTop=feedEl.scrollHeight;
+}
+function caption(t){document.getElementById('caption').textContent=t}
+function selectedFollow(id){if(document.getElementById('follow').checked)flyTo(id)}
+
+/* ---------- camera ---------- */
+function overviewR(){return Math.max(28,40*C.foc/(2*VX))}
+function flyTo(id){
+ if(id==='overview'){Object.assign(goal,{th:0.42,ph:1.0,r:overviewR(),tx:0,ty:1,tz:0});return}
+ const s=BY[id];if(!s)return;Object.assign(goal,{th:0.5,ph:1.12,r:13,tx:s.x,ty:1.6,tz:1});
+}
+let drag=null;
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,pan:e.shiftKey||e.button===2,moved:0};cv.classList.add('drag')});
+cv.addEventListener('pointermove',e=>{
+ if(!drag){const h=pickAt(e.clientX,e.clientY);cv.classList.toggle('hit',!!h);return}
+ const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;drag.moved+=Math.abs(dx)+Math.abs(dy);
+ if(drag.pan){const k=goal.r*0.0022;goal.tx-=(dx*Math.cos(goal.th))*k;goal.tz+=(dx*Math.sin(goal.th))*k;goal.tx-=dy*Math.sin(goal.th)*k*0.0;}
+ else{goal.th=Math.max(-1.35,Math.min(1.35,goal.th-dx*0.006));goal.ph=Math.max(0.35,Math.min(1.45,goal.ph-dy*0.005))}
+});
+cv.addEventListener('pointerup',e=>{const wasClick=drag&&drag.moved<5;drag=null;cv.classList.remove('drag');if(wasClick){const h=pickAt(e.clientX,e.clientY);if(h)select(h.id)}});
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('wheel',e=>{e.preventDefault();goal.r=Math.max(6,Math.min(48,goal.r*(1+Math.sign(e.deltaY)*0.09)))},{passive:false});
+function pickAt(x,y){let best=null;for(const h of hits){if(Math.hypot(h.x-x,h.y-y)<h.r&&(!best||h.z<best.z))best=h}return best}
+
+/* ---------- panels ---------- */
+function select(id){
+ selected=id;const s=BY[id],i=INFO[id];const card=document.getElementById('card');
+ const li=a=>a.map(v=>'<li></li>').join('');
+ card.innerHTML='<h2><span class="dot" style="background:'+s.color+'"></span><span id="cn"></span></h2><div class="role" id="cr"></div><h3>Tools</h3><div id="ct" style="font-size:13px"></div><h3>What it does</h3><ul id="cd">'+li(i.does)+'</ul><h3>Rules</h3><ul id="cu">'+li(i.rules)+'</ul><div class="last" id="cl"></div>';
+ document.getElementById('cn').textContent=s.name;document.getElementById('cr').textContent=i.role;document.getElementById('ct').textContent=i.tools.join(', ');
+ [...document.getElementById('cd').children].forEach((el,k)=>el.textContent=i.does[k]);[...document.getElementById('cu').children].forEach((el,k)=>el.textContent=i.rules[k]);
+ updateLast();
+}
+function updateLast(){const s=BY[selected];const el=document.getElementById('cl');if(el)el.textContent=s.last?('Last activity: '+s.last):(mode==='live'?'No live activity seen yet.':'')}
+
+/* ---------- sample job scoring (illustrative rule, not the real agent) ---------- */
+const BOOST=[['vision','computer vision'],['multimodal','multimodal'],['vlm','vision-language models'],['rag','RAG'],['llm','LLMs'],['evaluation','model evaluation'],['research','research'],['python','Python'],['pytorch','PyTorch'],['postdoc','postdoc research'],['scientist','scientist role'],['affective','affective computing'],['applied','applied ML']];
+const PEN=[['director','director-level leadership of teams'],['head of','head-of leadership role'],['manager','people management'],['lead','team lead experience'],['principal','principal-level seniority'],['mlops','MLOps in production'],['production','production deployment at scale'],['distributed','distributed systems'],['kubernetes','Kubernetes and cloud operations'],['aws','AWS cloud deployment'],['azure','Azure cloud deployment'],['gcp','GCP cloud deployment'],['hpc','HPC'],['c++','C++'],['java','Java'],['consult','client-facing consulting'],['forensic','digital forensics'],['audit','audit and assurance'],['compliance','regulatory compliance'],['bi ','BI team leadership']];
+function scoreJob(text){
+ const t=' '+text.toLowerCase()+' ';let s=3,str=[],gap=[];
+ for(const[k,m]of BOOST)if(t.includes(k)&&str.length<4){str.push(m);s+=0.5}
+ for(const[k,m]of PEN)if(t.includes(k)&&gap.length<5){gap.push(m);s-=1}
+ if(t.includes('senior')){s-=0.5;gap.push('senior-level industry tenure')}
+ s=Math.max(1,Math.min(5,Math.round(s)));
+ return{score:s,strengths:str,gaps:gap.slice(0,5)};
+}
+function showResult(job){
+ const r=document.getElementById('result');
+ const rec=job.score>=4?'Apply':job.score===3?'Hold or ask an eligibility question first':'Skip';
+ r.innerHTML='<h2></h2><div class="score"></div><div style="font-size:13px;margin-top:2px" id="rr"></div><ul id="rs"></ul><ul id="rg"></ul><div class="note">Sample estimate from keywords only. The real gap-coach reads the full job description against your evidence bank.</div>';
+ r.querySelector('h2').textContent='Sample result: '+job.short;r.querySelector('.score').textContent=job.score+' / 5';
+ document.getElementById('rr').textContent='Recommendation: '+rec;
+ const fill=(id,head,arr)=>{const u=document.getElementById(id);u.innerHTML='';if(!arr.length)return;const h=document.createElement('li');h.style.listStyle='none';h.style.marginLeft='-18px';h.style.color='#9aa7bb';h.style.fontSize='11px';h.style.textTransform='uppercase';h.textContent=head;u.appendChild(h);arr.forEach(a=>{const l=document.createElement('li');l.textContent=a;u.appendChild(l)})};
+ fill('rs','Matches your evidence',job.strengths);fill('rg','Gaps to check',job.gaps);
+ r.classList.add('show');
+}
+function hideResult(){document.getElementById('result').classList.remove('show')}
+
+/* ---------- demo ---------- */
+let mode='demo',steps=[],si=0,playing=false,stepAt=0,speed=1,curJob=null;
+function sampleJob(k){
+ const txt=k==='b'?'Director, Data Analytics and Applied AI. Lead BI team, production MLOps, AWS cloud, distributed systems':'Applied AI Researcher. Multimodal LLM, evaluation, research, Python, PyTorch';
+ const r=scoreJob(txt);return{title:txt,short:k==='b'?'Director, Data Analytics':'Applied AI Researcher',...r};
+}
+function buildSteps(job){
+ const S=[];
+ S.push({cap:'Job boards and career pages feed new postings into the factory.',d:2.6,fn(){hideResult();crate.x=-15;crateSet('batch','12 postings');crateTo('intake');setAct(['intake'],'new postings');feed('Postings arrive',COL.gray)}});
+ S.push({cap:'job-scout opens each posting: still open? In scope? eligibility flags, fit score 1-5, and a duplicate check against your applications folders and tracker.',d:3.6,fn(){crateTo('job-scout');setAct(['job-scout'],'checking and scoring...');feed('job-scout checks and scores postings',COL.teal)}});
+ S.push({cap:'The scout writes a ranked shortlist and a Build queue of new jobs only. Duplicates are dropped. It sends nothing.',d:2.8,fn(){crateSet('shortlist','shortlist.md');setAct(['job-scout'],'writing shortlist',3);feed('Shortlist written to shortlists',COL.teal)}});
+ S.push({cap:'For a job you choose yourself (/prepare-application), you pick it here: '+job.short+'. In a /job-sweep the queue goes straight on to the tailor.',d:3,fn(){crateTo('pick');crateSet('job',job.short);setAct(['pick'],'I pick this one');feed('You pick: '+job.short,COL.coral)}});
+ S.push({cap:'gap-coach matches the job description to your evidence and scores the fit.',d:4,fn(){crateTo('gap-coach');setAct(['gap-coach'],'matching requirements...');showResult(job);feed('gap-coach: fit '+job.score+'/5',COL.purple)}});
+ if(job.score<=2){
+  S.push({cap:'Fit '+job.score+'/5: gap-coach says skip. The run stops here and reports why, so no documents are built.',d:3.6,fn(){crateDrop();setAct(['gap-coach'],'recommend: skip');feed('Stopped: gap-coach recommends skip',COL.amber)}});
+ }else{
+  S.push({cap:'application-tailor re-checks for duplicates, creates the next numbered folder in Applications, then writes the requirements note, CV and cover letter.',d:4,fn(){crateTo('application-tailor');crateSet('pack','application pack');setAct(['application-tailor'],'building CV and letter...');feed('application-tailor builds the pack',COL.amber)}});
+  S.push({cap:'recruiter-reviewer reviews as a busy recruiter, then fact-checks every claim.',d:3.6,fn(){crateTo('recruiter-reviewer');setAct(['recruiter-reviewer'],'fact-checking...');feed('recruiter-reviewer checks the pack',COL.pink)}});
+  S.push({cap:'You review, confirm the facts and send it yourself. The agents never submit or email.',d:3.6,fn(){crateTo('outbox');setAct(['outbox'],'ready for you');feed('Pack ready: you decide and send',COL.coral)}});
+ }
+ S.push({cap:'Run complete. Press Restart to watch again, or try your own job below.',d:1,fn(){setAct([]);playing=false;setPlay()}});
+ return S;
+}
+function startDemo(job){curJob=job;steps=buildSteps(job);si=0;playing=false;crateHide();ST.forEach(s=>{s.act=0});hideResult();caption('Press Play, or Step through one stage at a time.');setPlay()}
+function runStep(){if(si>=steps.length)return false;const s=steps[si++];caption(s.cap);s.fn();stepAt=now()+s.d;return true}
+function setPlay(){document.getElementById('bPlay').textContent=playing?'Pause':'Play'}
+function tickDemo(){if(mode!=='demo'||!playing)return;if(now()>=stepAt){if(!runStep())playing=false,setPlay()}}
+document.getElementById('bPlay').onclick=()=>{if(mode!=='demo')return;if(si>=steps.length)startDemo(curJob);playing=!playing;if(playing)stepAt=Math.min(stepAt,now());if(playing&&si===0)runStep();setPlay()};
+document.getElementById('bStep').onclick=()=>{if(mode!=='demo')return;playing=false;setPlay();if(si>=steps.length)startDemo(curJob);runStep()};
+document.getElementById('bRestart').onclick=()=>{if(mode!=='demo')return;startDemo(curJob)};
+document.getElementById('speed').onchange=e=>{speed=parseFloat(e.target.value)};
+document.getElementById('sample').onchange=e=>{startDemo(sampleJob(e.target.value))};
+document.getElementById('bTry').onclick=tryJob;
+document.getElementById('jobin').addEventListener('keydown',e=>{if(e.key==='Enter')tryJob()});
+function tryJob(){
+ const v=document.getElementById('jobin').value.trim();if(!v)return;
+ setMode('demo');const r=scoreJob(v);const job={title:v,short:v.length>34?v.slice(0,33)+'~':v,...r};
+ startDemo(job);playing=true;runStep();setPlay();
+}
+document.querySelectorAll('[data-cam]').forEach(b=>b.onclick=()=>flyTo(b.dataset.cam));
+
+/* ---------- live mode ---------- */
+let after=0,queue=[],liveOK=false,lastQ=0,active=[],runKind='',evTotal=0,pollT=null,rawOn=false;
+const rawEl=document.getElementById('raw');
+function setMode(m){
+ if(m===mode)return;mode=m;
+ document.getElementById('mDemo').classList.toggle('on',m==='demo');document.getElementById('mLive').classList.toggle('on',m==='live');
+ document.getElementById('demoCtl').style.display=m==='demo'?'flex':'none';document.getElementById('liveTools').style.display=m==='live'?'flex':'none';
+ playing=false;setPlay();setAct([]);crateHide();hideResult();active=[];
+ const st=document.getElementById('status');
+ if(m==='live'){caption('Live mode: run /job-sweep or /prepare-application in Claude Code and watch the factory react.');startPoll()}
+ else{stopPoll();st.textContent='demo mode';st.className='';startDemo(curJob||sampleJob('a'))}
+ updateLast();
+}
+document.getElementById('mDemo').onclick=()=>setMode('demo');document.getElementById('mLive').onclick=()=>setMode('live');
+function startPoll(){stopPoll();setStatus('connecting...','');poll();pollT=setInterval(poll,700)}
+function stopPoll(){if(pollT){clearInterval(pollT);pollT=null}}
+function setStatus(t,c){const s=document.getElementById('status');s.textContent=t;s.className=c}
+async function poll(){
+ try{
+  const r=await fetch('/events?after='+after,{cache:'no-store'});const j=await r.json();
+  if(!liveOK){liveOK=true;document.getElementById('err').style.display='none'}
+  setStatus('live: connected','ok');
+  if(j.next<after){after=0}else{after=j.next}
+  for(const e of j.events)queue.push(e);
+  evTotal=after;document.getElementById('evcount').textContent=evTotal+' events';
+ }catch(err){
+  liveOK=false;setStatus('live: not reachable','bad');
+  const el=document.getElementById('err');el.style.display='block';
+  el.textContent=location.protocol==='file:'?'Open this page through the local server: python3 dashboard/serve.py, then http://127.0.0.1:8765':'Cannot reach /events. Is serve.py still running?';
+ }
+}
+setInterval(()=>{if(mode==='live'&&queue.length&&now()-lastQ>0.32){lastQ=now();handle(queue.shift())}},60);
+const isTask=t=>t==='Task'||t==='Agent';
+function topAgent(){return active.length?active[active.length-1]:null}
+function ensureRun(kind){if(!crate.vis||!runKind){runKind=kind||'run';crate.x=-15;crateSet('batch',kind==='prepare'?'job description':'postings');crateTo('intake');setAct(['intake'])}}
+function startAgent(a,desc){
+ ensureRun(runKind||'run');if(!active.includes(a))active.push(a);
+ if(a==='job-scout'){crateSet('batch','postings')}
+ else if(a==='gap-coach'){crateSet('job','job')}
+ else if(a==='application-tailor'){crateSet('pack','application pack')}
+ crateTo(a);setAct(active.slice(),desc?desc.slice(0,30):'working...',6);
+ BY[a].last='started: '+(desc||'');feed(a+' started'+(desc?': '+desc:''),BY[a].color);updateLast();
+}
+function finishAgent(a){
+ if(!a)return;const i=active.indexOf(a);if(i<0)return;active.splice(i,1);
+ bubble(a,'done',3);BY[a].last='finished';feed(a+' finished',BY[a].color);
+ if(a==='job-scout')crateSet('shortlist','shortlist.md');
+ setAct(active.slice());updateLast();
+}
+function describe(e){
+ const t=e.tool||'';const i=e.info||'';
+ if(t==='WebSearch')return'searching: '+i;if(t==='WebFetch')return'reading page: '+i;
+ if(t==='Read')return'reading '+base(e.fp||i);if(t==='Write')return'writing '+base(e.fp||i);if(t==='Edit')return'editing '+base(e.fp||i);
+ if(t==='Bash')return/latexmk|xelatex/.test(i)?'building PDF':'running: '+i;if(t==='Grep'||t==='Glob')return'searching files: '+i;
+ return t+(i?': '+i:'');
+}
+const base=p=>String(p).split('/').pop();
+function handle(e){
+ if(rawOn){rawEl.textContent=(JSON.stringify(e)+'\n'+rawEl.textContent).slice(0,3000)}
+ const ev=e.ev,t=e.tool||'';
+ if(ev==='UserPromptSubmit'){
+  const p=(e.info||'').toLowerCase();
+  if(p.includes('job-sweep')){runKind='sweep';crate.vis=false;ensureRun('sweep');feed('You: /job-sweep',COL.coral);caption('Job sweep started: the scout will search and score postings.')}
+  else if(p.includes('prepare-application')){runKind='prepare';crate.vis=false;ensureRun('prepare');feed('You: /prepare-application',COL.coral);caption('Preparing an application: gap-coach first, then tailor and reviewer.')}
+  else{feed('You: '+(e.info||'prompt'),COL.coral)}
+  return;
+ }
+ if(isTask(t)&&ev==='PreToolUse'&&INFO[e.sub]&&e.sub!=='intake'){startAgent(e.sub,e.info);return}
+ if(isTask(t)&&ev==='PostToolUse'){finishAgent(e.sub);return}
+ if(ev==='SubagentStop'){finishAgent(e.sub||topAgent());return}
+ if(ev==='Stop'){
+  while(active.length)finishAgent(active[0]);
+  if(crate.vis){crateTo(runKind==='sweep'?'pick':'outbox');setAct([runKind==='sweep'?'pick':'outbox'],runKind==='sweep'?'pick a job':'ready for you',8)}
+  feed('Run finished: over to you',COL.coral);caption('Run finished. Review the output, then decide what to do next.');runKind='';return;
+ }
+ if(ev==='PreToolUse'){
+  const a=topAgent();const d=describe(e);
+  if(a){bubble(a,d.slice(0,34),4);BY[a].last=d;beltBoost=1}
+  feed((a?a+': ':'main: ')+d,a?BY[a].color:COL.gray);
+  if(t==='Write'&&/Shortlists\//.test(e.fp||''))crateSet('shortlist','shortlist.md');
+  if(t==='Write'&&/Applications\//.test(e.fp||'')&&a==='application-tailor')crateSet('pack','application pack');
+  updateLast();
+ }
+}
+let beltBoost=0;
+const rawBtn=document.getElementById('btnRaw');
+rawBtn.onclick=()=>{rawOn=!rawOn;rawEl.style.display=rawOn?'block':'none';rawBtn.classList.toggle('on',rawOn)};
+document.getElementById('btnTest').onclick=()=>fetch('/test',{method:'POST'}).catch(()=>{});
+document.getElementById('btnClear').onclick=()=>fetch('/clear',{method:'POST'}).then(()=>{after=0;queue.length=0;active=[];feedEl.innerHTML=''}).catch(()=>{});
+
+/* ---------- main loop ---------- */
+let last=now();
+function frame(){
+ const t=now(),dt=Math.min(0.1,t-last);last=t;
+ for(const k of['th','ph','r','tx','ty','tz'])cam[k]+=(goal[k]-cam[k])*Math.min(1,dt*5);
+ setupCam();tickDemo();
+ for(const s of ST){s.glow+=((s.act?1:0)-s.glow)*Math.min(1,dt*6)}
+ if(crate.mode==='belt'){const d=crate.tx-crate.x;const mv=Math.sign(d)*Math.min(Math.abs(d),Math.max(Math.abs(d)*3.2,0.8)*dt*1.4*speed);crate.x+=mv;running=Math.abs(d)>0.05}
+ else if(crate.mode==='drop'){crate.vy-=9*dt;crate.y+=crate.vy*dt;crate.z+=crate.vz*dt;crate.vz*=0.985;if(crate.y<=0.95&&crate.z>3.7){crate.y=0.95;crate.mode='rest';crate.vy=0}running=true}
+ beltBoost=Math.max(0,beltBoost-dt*0.8);
+ const want=(running||active.length||beltBoost>0||(mode==='demo'&&playing))?2.2:0.25;beltSpd+=(want-beltSpd)*Math.min(1,dt*2);beltOff+=beltSpd*dt;
+ drawFloor(t);list=[];
+ drawBelt(t);drawBin(t);for(const s of ST)drawStation(s,t);drawCrate(t);
+ drawList();drawLabels(t);
+ requestAnimationFrame(frame);
+}
+select('job-scout');startDemo(sampleJob('a'));setupCam();flyTo('overview');Object.assign(cam,goal);setupCam();requestAnimationFrame(frame);
+</script>
+</body>
+</html>

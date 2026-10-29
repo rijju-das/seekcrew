@@ -1,0 +1,24 @@
+# Personal files: never commit these to a public repository
+PROFILE.md
+EVIDENCE_BANK.md
+WRITING_STYLE_GUIDE.local.md
+tracker.csv
+seekcrew.config.json
+applications/
+shortlists/
+master/
+.backups/
+dashboard/events.jsonl
+.claude/settings.json
+.claude/settings.json.bak
+.claude/settings.local.json
+
+# Build and tool clutter
+__pycache__/
+*.pyc
+*.aux
+*.log
+*.out
+*.synctex.gz
+.DS_Store
+.venv/

@@ -1,0 +1,10 @@
+{
+  "types": ["Industry", "Research", "Academic", "Internship", "Contract", "Other"],
+  "modes": ["", "On-site", "Hybrid", "Remote"],
+  "sources": ["LinkedIn", "Company website", "Job board", "Referral", "Recruiter", "Other"],
+  "statuses": ["Saved", "Preparing", "On hold", "Not pursuing", "Applied", "Screening", "Interview", "Assignment", "Reference check", "Offer", "Rejected", "Withdrawn", "Closed"],
+  "priorities": ["", "High", "Medium", "Low"],
+  "phrases": [["massachusetts institute of technology", "mit"], ["international business machines", "ibm"]],
+  "aliases": {"msft": "microsoft"},
+  "employer_generic": []
+}

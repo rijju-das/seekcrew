@@ -1,0 +1,28 @@
+{
+  "note": "Fictional employers and roles. Each case is: an existing tracker row, a new job, and the verdict a careful person would give.",
+  "config": {
+    "phrases": [["massachusetts institute of technology", "mit"], ["northfield university", "nfu"], ["international business machines", "ibm"]],
+    "aliases": {"msft": "microsoft"}
+  },
+  "existing": [
+    {"company": "Northwind Analytics Ltd", "role": "Applied Scientist, Computer Vision", "url": "https://careers.northwind.example/jobs/48213", "job_id": "48213"},
+    {"company": "Northfield University", "role": "Research Data Engineer, Data Platform", "url": "https://jobs.northfield.example/posting/020015", "job_id": "020015"},
+    {"company": "Contoso Health", "role": "Machine Learning Engineer, Speech", "url": "", "job_id": ""},
+    {"company": "International Business Machines", "role": "Research Scientist, Quantum Software", "url": "", "job_id": ""},
+    {"company": "Fabrikam Robotics", "role": "Robotics Software Engineer", "url": "", "job_id": ""}
+  ],
+  "cases": [
+    {"name": "same URL, different title wording", "employer": "Northwind Analytics", "role": "Computer Vision Scientist", "url": "https://careers.northwind.example/jobs/48213?utm_source=linkedin", "job_id": "", "expect": "DUPLICATE"},
+    {"name": "same job id, different site", "employer": "Northwind", "role": "Applied Scientist", "url": "https://boards.example/view/48213", "job_id": "48213", "expect": "DUPLICATE"},
+    {"name": "same employer, same title, no ids", "employer": "Contoso Health Inc", "role": "Machine Learning Engineer, Speech", "url": "", "job_id": "", "expect": "DUPLICATE"},
+    {"name": "employer written two ways (alias phrase)", "employer": "IBM", "role": "Research Scientist, Quantum Software", "url": "", "job_id": "", "expect": "DUPLICATE"},
+    {"name": "same employer, only generic title words", "employer": "Fabrikam Robotics", "role": "Software Engineer", "url": "", "job_id": "", "expect": "POSSIBLE"},
+    {"name": "same employer, partly overlapping title", "employer": "Contoso Health", "role": "Senior Machine Learning Engineer, Speech Recognition", "url": "", "job_id": "", "expect": "DUPLICATE"},
+    {"name": "same employer, clearly different job", "employer": "Northwind Analytics", "role": "Finance Business Partner", "url": "", "job_id": "", "expect": "NEW"},
+    {"name": "different employer, same title", "employer": "Adventure Works", "role": "Applied Scientist, Computer Vision", "url": "", "job_id": "", "expect": "NEW"},
+    {"name": "new employer, new role", "employer": "Tailspin Toys", "role": "Data Analyst", "url": "https://tailspin.example/job/77001", "job_id": "77001", "expect": "NEW"},
+    {"name": "similar number in a different context is not a job id", "employer": "Wingtip Labs", "role": "Backend Engineer", "url": "", "job_id": "", "expect": "NEW"},
+    {"name": "alias: NFU abbreviation", "employer": "NFU", "role": "Research Data Engineer, Data Platform", "url": "", "job_id": "", "expect": "DUPLICATE"},
+    {"name": "university, different school and role", "employer": "Northfield University School of Law", "role": "Lecturer in Contract Law", "url": "", "job_id": "", "expect": "NEW"}
+  ]
+}
