@@ -22,3 +22,10 @@ __pycache__/
 *.synctex.gz
 .DS_Store
 .venv/
+
+# Agent runs and evaluation data (advert text belongs to employers; labels are personal)
+runs/
+eval/data/
+eval/boards.json
+eval/baseline_keywords.json
+.env

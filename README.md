@@ -17,6 +17,8 @@ It runs on your own computer, in your own Claude Code, on your own files. There 
 | `/job-sweep`, `/prepare-application` | Commands that run the agents in order |
 | `tools/app_tools.py` | Plain Python (standard library only): duplicate check, folder numbering, tracker rows with backup and rollback |
 | `dashboard/` | Optional local page that shows the agents at work |
+| `agent/` | The screening step written as a standalone agent: a tool-use loop on the Anthropic Messages API with batching, memory, error handling, budgets, tracing, resume and a local HTTP service (standard library only). See [agent/README.md](agent/README.md) |
+| `eval/` | Measures how well screening agrees with your own labels on a frozen sample of real adverts, against a keyword baseline: precision, recall, F1, fit agreement, cost, tool errors, grounding of evidence quotes and run-to-run stability. See [eval/README.md](eval/README.md) |
 
 ## Rules built into the agents
 
@@ -28,6 +30,7 @@ It runs on your own computer, in your own Claude Code, on your own files. There 
 
 - **Stored locally.** Your profile, evidence bank, CVs, application folders, shortlists, tracker and backups are plain files in this folder on your computer.
 - **Kept out of git.** `.gitignore` excludes those personal files, so they are not committed or pushed if you fork or share your copy. Run `git status` before every commit to check.
+- **Your own API key for `agent/`.** The standalone agent calls the Anthropic API with the key in your `ANTHROPIC_API_KEY` environment variable. Never put the key in a file in this folder. Run folders (`runs/`) and evaluation data (`eval/data/`) are git-ignored.
 - **No server, account, database or analytics.** Seekcrew has none of these. The optional dashboard listens on `127.0.0.1` only, so other machines cannot open it.
 - **What does leave your computer.** When the agents work, Claude Code sends the files they read (for example your CV and profile) and the job texts to Anthropic for processing, as in any Claude Code session, under your Claude plan's terms. The job-scout agent also runs web searches and opens job pages.
 - **Nothing is sent for you.** The agents never submit applications, send emails or messages, or fill in forms. You review every document and apply yourself.
@@ -67,7 +70,9 @@ It normalises URLs, picks job IDs out of text, ignores generic words in employer
 python3 -m unittest discover -s tests -v
 ```
 
-The suite covers folder numbering, refusals, forcing, the tracker (new file, permanent IDs, existing rows unchanged, backup, rollback on a failed write, invalid values rejected) and 12 labelled duplicate cases. The labelled set is small, written by the author with fictional employers and roles, and not independent, so treat the 100% it prints as a regression check, not as a measured accuracy on real postings. Add your own cases to `tests/labelled_pairs.json` when the check gets one wrong.
+`tests/test_agent.py` covers the agent loop with a scripted model (happy path, tool errors fed back, unknown tools, refused early finish, reminders, token and cost budgets, model errors, memory across batches, resume, the duplicate check), the API client's retries, the local service, the metrics and the advert collector. No key or network is needed.
+
+The duplicate-check suite covers folder numbering, refusals, forcing, the tracker (new file, permanent IDs, existing rows unchanged, backup, rollback on a failed write, invalid values rejected) and 12 labelled duplicate cases. The labelled set is small, written by the author with fictional employers and roles, and not independent, so treat the 100% it prints as a regression check, not as a measured accuracy on real postings. Add your own cases to `tests/labelled_pairs.json` when the check gets one wrong.
 
 ## Limits
 
@@ -86,6 +91,8 @@ The suite covers folder numbering, refusals, forcing, the tracker (new file, per
 tools/app_tools.py   duplicate check, numbering, tracker (stdlib only)
 tests/               unittest suite and labelled cases
 dashboard/           optional local dashboard and hook logger
+agent/               standalone screening agent: loop, tools, model client, CLI, local service
+eval/                advert collector, labelling sheet, metrics, evaluation runner
 *.example.*          templates; `init` copies them to your private files
 ```
 

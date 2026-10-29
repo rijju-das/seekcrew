@@ -1,0 +1,5 @@
+{
+  "_comment": "Keywords for the keyword baseline and the dry run. A job counts as relevant when its title contains at least 'threshold' of them. Copy to eval/baseline_keywords.json and edit to match your profile.",
+  "threshold": 2,
+  "keywords": ["machine learning", "ml", "ai", "research", "scientist", "computer vision", "vision", "multimodal", "llm", "nlp", "deep learning", "applied", "data scientist", "researcher", "generative"]
+}

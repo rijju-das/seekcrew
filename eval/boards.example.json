@@ -1,0 +1,22 @@
+{
+  "_comment": "Public job boards to sample for the evaluation. provider is greenhouse, lever or ashby; token is the board name in the board's public URL. Copy to eval/boards.json and edit. Boards that do not answer are reported and skipped.",
+  "boards": [
+    {"company": "Stripe", "provider": "greenhouse", "token": "stripe"},
+    {"company": "Intercom", "provider": "greenhouse", "token": "intercom"},
+    {"company": "Datadog", "provider": "greenhouse", "token": "datadog"},
+    {"company": "Cloudflare", "provider": "greenhouse", "token": "cloudflare"},
+    {"company": "Squarespace", "provider": "greenhouse", "token": "squarespace"},
+    {"company": "Anthropic", "provider": "greenhouse", "token": "anthropic"},
+    {"company": "Hugging Face", "provider": "greenhouse", "token": "huggingface"},
+    {"company": "OpenAI", "provider": "ashby", "token": "openai"},
+    {"company": "Wayve", "provider": "ashby", "token": "wayve"},
+    {"company": "Synthesia", "provider": "lever", "token": "synthesia"},
+    {"company": "Palantir", "provider": "lever", "token": "palantir"}
+  ],
+  "location_patterns": ["\\bireland\\b", "\\bdublin\\b", "\\bcork\\b", "\\bgalway\\b", "\\blimerick\\b", "remote.*(emea|europe|ireland)", "(emea|europe).*remote"],
+  "exclude_location_patterns": ["northern ireland", "belfast"],
+  "sample_size": 60,
+  "technical_share": 0.6,
+  "technical_title_pattern": "\\b(ai|ml|machine learning|data|research|scientist|vision|llm|nlp|engineer|engineering|analytics|applied)\\b",
+  "seed": 13
+}
