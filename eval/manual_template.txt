@@ -1,0 +1,8 @@
+Company: Example Ltd
+Title: Machine Learning Scientist
+Location: Dublin, Ireland (hybrid)
+URL: https://www.linkedin.com/jobs/view/0000000000
+
+Paste the full advert text here, after one blank line: the role, responsibilities,
+requirements and anything about location or eligibility. Copy it by hand from the page;
+do not use scripts or extensions to scrape job sites.

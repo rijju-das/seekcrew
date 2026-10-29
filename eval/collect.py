@@ -5,6 +5,13 @@ Run this on your own computer (it needs normal internet access):
 
     python3 eval/collect.py                    # uses eval/boards.json, or boards.example.json
     python3 eval/collect.py --sample-size 25
+    python3 eval/collect.py --add-manual       # add new adverts from eval/manual/ to the frozen sample
+
+Adverts you found yourself (for example on LinkedIn or HiringCafe, which have no public API and
+must not be scraped) can be added by hand: save each one as a .txt file in eval/manual/ in the
+format of eval/manual_template.txt. They are added on top of the board sample, marked source
+"manual", and the evaluation report counts adverts per source. --add-manual appends only adverts
+that are not in the sample yet and never changes existing rows or labels.
 
 It reads public Greenhouse, Lever and Ashby job-board APIs, keeps adverts whose location
 matches your patterns, draws a seeded sample that mixes technical and non-technical titles,
@@ -20,6 +27,7 @@ Standard library only.
 import argparse
 import csv
 import datetime
+import hashlib
 import html
 import json
 import random
@@ -99,6 +107,81 @@ def normalise(provider, company, item):
             "url": url, "text": text, "source": provider}
 
 
+HEADER_KEYS = {"company": "company", "title": "title", "location": "location", "url": "url", "link": "url"}
+
+
+def read_manual(path):
+    """Parse one manual advert: 'Key: value' header lines, a blank line, then the advert text."""
+    raw = Path(path).read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n")
+    head, _, body = raw.partition("\n\n")
+    fields = {}
+    for line in head.splitlines():
+        key, sep, val = line.partition(":")
+        k = HEADER_KEYS.get(key.strip().lower())
+        if sep and k:
+            fields[k] = val.strip()
+    missing = [k for k in ("company", "title") if not fields.get(k)]
+    if missing:
+        raise ValueError("%s: missing %s (see eval/manual_template.txt)" % (Path(path).name, " and ".join(missing)))
+    text = body.strip()
+    if len(text) < 200:
+        raise ValueError("%s: the advert text is very short (%d characters); paste the full advert below the blank line" % (Path(path).name, len(text)))
+    key = fields.get("url") or Path(path).name
+    digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:10]
+    return {"id": "manual-%s-%s" % (re.sub(r"\W+", "", fields["company"].lower())[:20], digest),
+            "company": fields["company"], "title": fields["title"], "location": fields.get("location", ""),
+            "url": fields.get("url", ""), "text": text, "source": "manual", "file": Path(path).name}
+
+
+def manual_adverts(folder):
+    ads, problems = [], []
+    folder = Path(folder)
+    if not folder.exists():
+        return ads, problems
+    for f in sorted(folder.glob("*.txt")) + sorted(folder.glob("*.md")):
+        try:
+            ads.append(read_manual(f))
+        except (ValueError, OSError) as e:
+            problems.append(str(e))
+    return ads, problems
+
+
+def same_job(a, b):
+    ua, ub = (a.get("url") or "").rstrip("/").lower(), (b.get("url") or "").rstrip("/").lower()
+    return a["id"] == b["id"] or (ua and ua == ub)
+
+
+def write_sample(out_ads, out_labels, ads, append=False):
+    stamp = datetime.datetime.now().isoformat(timespec="seconds")
+    with out_ads.open("a" if append else "w") as f:
+        for x in ads:
+            f.write(json.dumps(dict(x, collected=stamp)) + "\n")
+    new_file = not (append and out_labels.exists())
+    with out_labels.open("a" if not new_file else "w", newline="") as f:
+        w = csv.writer(f)
+        if new_file:
+            w.writerow(["id", "company", "title", "location", "url", "relevant", "fit", "notes"])
+        for x in ads:
+            w.writerow([x["id"], x["company"], x["title"], x["location"], x["url"], "", "", ""])
+
+
+def add_manual_only(manual_dir):
+    out_ads, out_labels = DATA / "adverts.jsonl", DATA / "labels.csv"
+    if not out_ads.exists():
+        sys.exit("No frozen sample yet. Run python3 eval/collect.py first.")
+    existing = [json.loads(l) for l in out_ads.read_text().splitlines() if l.strip()]
+    ads, problems = manual_adverts(manual_dir)
+    for p in problems:
+        print("  skipped: " + p)
+    new = [a for a in ads if not any(same_job(a, e) for e in existing)]
+    if not new:
+        print("No new manual adverts to add (%d found, all already in the sample)." % len(ads))
+        return
+    write_sample(out_ads, out_labels, new, append=True)
+    print("Added %d manual adverts to the sample (%d already there). Label the new rows at the end of %s." % (
+        len(new), len(ads) - len(new), out_labels))
+
+
 def location_ok(loc, include, exclude):
     low = (loc or "").lower()
     if any(re.search(p, low) for p in exclude):
@@ -126,7 +209,11 @@ def main(argv=None):
     ap.add_argument("--boards", default=None, help="boards file (default eval/boards.json, else the example)")
     ap.add_argument("--sample-size", type=int, default=None)
     ap.add_argument("--force", action="store_true", help="replace an existing frozen sample")
+    ap.add_argument("--manual-dir", default=str(HERE / "manual"), help="folder of hand-saved adverts (default eval/manual)")
+    ap.add_argument("--add-manual", action="store_true", help="only add new manual adverts to the existing sample")
     a = ap.parse_args(argv)
+    if a.add_manual:
+        return add_manual_only(a.manual_dir)
 
     bpath = Path(a.boards) if a.boards else (HERE / "boards.json" if (HERE / "boards.json").exists() else HERE / "boards.example.json")
     cfg = json.loads(bpath.read_text())
@@ -160,17 +247,15 @@ def main(argv=None):
     if not picked:
         sys.exit("No adverts matched. Check the boards and location patterns.")
 
+    manual, problems = manual_adverts(a.manual_dir)
+    for p in problems:
+        print("  manual advert skipped: " + p)
+    manual = [m for m in manual if not any(same_job(m, x) for x in picked)]
     DATA.mkdir(exist_ok=True)
-    stamp = datetime.datetime.now().isoformat(timespec="seconds")
-    with out_ads.open("w") as f:
-        for x in picked:
-            f.write(json.dumps(dict(x, collected=stamp)) + "\n")
-    with out_labels.open("w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["id", "company", "title", "location", "url", "relevant", "fit", "notes"])
-        for x in picked:
-            w.writerow([x["id"], x["company"], x["title"], x["location"], x["url"], "", "", ""])
-    print("\nIn scope: %d unique adverts. Sampled %d (seed %s)." % (len(unique), len(picked), cfg.get("seed", 13)))
+    write_sample(out_ads, out_labels, picked + manual)
+    tech = sum(1 for x in picked if re.search(cfg["technical_title_pattern"], x["title"].lower()))
+    print("\nIn scope: %d unique adverts. Sampled %d from boards (seed %s; %d with titles in your field), plus %d manual." % (
+        len(unique), len(picked), cfg.get("seed", 13), tech, len(manual)))
     print("Wrote %s and %s" % (out_ads, out_labels))
     print("Next: open eval/data/labels.csv, fill in 'relevant' (yes/no) and 'fit' (1-5) for every row, save as CSV.")
 

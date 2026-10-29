@@ -29,3 +29,4 @@ eval/data/
 eval/boards.json
 eval/baseline_keywords.json
 .env
+eval/manual/

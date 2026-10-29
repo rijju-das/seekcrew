@@ -13,6 +13,14 @@ How often does a screening system agree with your own judgement about which jobs
 
    It reads public Greenhouse, Lever and Ashby job-board APIs, keeps adverts in your locations and draws a seeded sample (default 60) that mixes technical and non-technical titles. The sample is frozen: rerunning the evaluation uses the same adverts. `eval/data/` is git-ignored because advert text belongs to the employers.
 
+   **Adverts from LinkedIn, HiringCafe or elsewhere** can be added by hand. These sites have no public API and must not be scraped, so copy the advert text yourself: save each advert as a `.txt` file in `eval/manual/` in the format of `eval/manual_template.txt` (Company, Title, Location and URL lines, a blank line, then the full advert). They are added on top of the board sample when you collect, or later with:
+
+   ```bash
+   python3 eval/collect.py --add-manual      # appends new manual adverts; existing rows and labels are kept
+   ```
+
+   Hand-picked adverts are likelier to be relevant, so the report shows how many adverts, and how many relevant ones, came from each source. Use them to top up good matches, not to replace the board sample.
+
 2. **Label it yourself** in `eval/data/labels.csv` (Excel, Numbers or any editor; save as CSV). Label before you look at any system's output, so the labels are not influenced by it.
 
    - `relevant`: `yes` if you would want this job on your shortlist (field, level and location all acceptable), otherwise `no`.

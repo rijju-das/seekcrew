@@ -412,6 +412,39 @@ class Collect(unittest.TestCase):
         self.assertFalse(C.location_ok("Belfast, Northern Ireland", inc, exc))
         self.assertFalse(C.location_ok("London", inc, exc))
 
+    def test_manual_adverts_parse_and_append_without_touching_labels(self):
+        import collect as C
+        tmp = Path(tempfile.mkdtemp(prefix="seekcrew_manual_"))
+        try:
+            man = tmp / "manual"
+            man.mkdir()
+            body = "Responsibilities and requirements. " * 10
+            (man / "a.txt").write_text("Company: Acme\nTitle: ML Scientist\nLocation: Dublin\nURL: https://x.example/1\n\n" + body)
+            (man / "bad.txt").write_text("Title: No company\n\n" + body)
+            ads, problems = C.manual_adverts(man)
+            self.assertEqual(len(ads), 1)
+            self.assertEqual(ads[0]["source"], "manual")
+            self.assertTrue(ads[0]["id"].startswith("manual-acme-"))
+            self.assertIn("missing company", problems[0])
+            old = C.DATA
+            C.DATA = tmp / "data"
+            C.DATA.mkdir()
+            try:
+                board = {"id": "greenhouse-x-1", "company": "X", "title": "T", "location": "Dublin", "url": "https://g/1", "text": "t"}
+                C.write_sample(C.DATA / "adverts.jsonl", C.DATA / "labels.csv", [board])
+                labels = (C.DATA / "labels.csv").read_text().replace("greenhouse-x-1,X,T,Dublin,https://g/1,,,", "greenhouse-x-1,X,T,Dublin,https://g/1,no,1,")
+                (C.DATA / "labels.csv").write_text(labels)
+                C.add_manual_only(man)
+                C.add_manual_only(man)  # second time adds nothing
+                rows = (C.DATA / "labels.csv").read_text().splitlines()
+                self.assertEqual(len(rows), 3)
+                self.assertIn(",no,1,", rows[1])
+                self.assertEqual(len((C.DATA / "adverts.jsonl").read_text().splitlines()), 2)
+            finally:
+                C.DATA = old
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_sample_is_seeded_and_mixed(self):
         import collect as C
         pool = [{"id": "t%d" % i, "title": "ML Engineer"} for i in range(40)] + [{"id": "o%d" % i, "title": "Sales Lead"} for i in range(40)]

@@ -123,6 +123,7 @@ def report_md(meta, systems):
     L = ["# Seekcrew screening evaluation", "",
          "Date: %s. Adverts: %d labelled (%d unlabelled skipped), %d labelled relevant. Model: %s." % (
              meta["date"], meta["labelled"], meta["skipped"], meta["positives"], meta.get("model") or "n/a"),
+         "Sources (adverts, of which labelled relevant): " + ", ".join("%s %d (%d)" % (k, v[0], v[1]) for k, v in sorted(meta.get("sources", {}).items())) + ".",
          "Labels are one person's judgement for their own profile, so results describe agreement with that person, not general accuracy.", "",
          "## Relevance (shortlist decision)", "",
          "| System | Runs | Precision | Recall | F1 (95% CI, run 1) | Coverage |", "|---|---|---|---|---|---|"]
@@ -168,7 +169,7 @@ def report_md(meta, systems):
     L += ["", "## Notes", "",
           "- Undecided jobs count as not relevant for precision and recall; coverage shows how many were decided.",
           "- The 95% interval resamples the labelled jobs (2,000 bootstrap samples) and reflects the small sample.",
-          "- The sample was drawn with a fixed seed from public job boards and mixes technical and non-technical titles, which makes the keyword baseline look better than on an unfiltered feed.",
+          "- The board sample was drawn with a fixed seed and takes about half its adverts from titles in the user's field, which makes the keyword baseline look better than on an unfiltered feed. Manual adverts were chosen by the user and are likelier to be relevant.",
           "- Cost is the provider-reported cost when available (OpenRouter), otherwise an estimate from token counts and the prices passed in. Check it against your provider's dashboard."]
     return "\n".join(L) + "\n"
 
@@ -252,7 +253,14 @@ def main(argv=None):
     if "dry" in systems and "baseline" in systems:
         same = abs(systems["dry"]["runs"][0]["f1"] - systems["baseline"]["runs"][0]["f1"]) < 1e-9
         print("Pipeline check (dry run scores exactly like the baseline): %s" % ("PASS" if same else "FAIL"))
+    sources = {}
+    for j in jobs:
+        src = j.get("source", "unknown")
+        sources.setdefault(src, [0, 0])
+        sources[src][0] += 1
+        sources[src][1] += int(gold_rel[j["id"]])
     meta = {"date": stamp, "labelled": len(gold_rel), "skipped": skipped, "positives": sum(gold_rel.values()),
+            "sources": sources,
             "model": model_id, "repeats": a.repeats, "batch_size": a.batch_size}
     out.mkdir(parents=True, exist_ok=True)
     (out / "results.json").write_text(json.dumps({"meta": meta, "systems": systems}, indent=1))
