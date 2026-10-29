@@ -33,3 +33,7 @@ eval/manual/
 
 # Evaluation reports: publish one deliberately with git add -f eval/results/<run>
 eval/results/
+
+# Earlier versions of your profile and evidence bank
+PROFILE.v*.md
+EVIDENCE_BANK.v*.md

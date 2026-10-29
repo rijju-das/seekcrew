@@ -26,6 +26,7 @@ Per-job decisions stay in runs/ (git-ignored).
 import argparse
 import csv
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -123,6 +124,8 @@ def report_md(meta, systems):
     L = ["# Seekcrew screening evaluation", "",
          "Date: %s. Adverts: %d labelled (%d unlabelled skipped), %d labelled relevant. Model: %s." % (
              meta["date"], meta["labelled"], meta["skipped"], meta["positives"], meta.get("model") or "n/a"),
+         "Inputs (first 10 hex of SHA-256): profile %s, evidence bank %s, labels %s. Runs with the same three values used identical inputs." % (
+             meta.get("profile_sha256"), meta.get("evidence_sha256"), meta.get("labels_sha256")),
          "Sources (adverts, of which labelled relevant): " + ", ".join("%s %d (%d)" % (k, v[0], v[1]) for k, v in sorted(meta.get("sources", {}).items())) + ".",
          "Labels are one person's judgement for their own profile, so results describe agreement with that person, not general accuracy.", "",
          "## Relevance (shortlist decision)", "",
@@ -264,7 +267,11 @@ def main(argv=None):
         sources.setdefault(src, [0, 0])
         sources[src][0] += 1
         sources[src][1] += int(gold_rel[j["id"]])
-    meta = {"date": stamp, "labelled": len(gold_rel), "skipped": skipped, "positives": sum(gold_rel.values()),
+    def short_hash(path):
+        p = Path(path)
+        return hashlib.sha256(p.read_bytes()).hexdigest()[:10] if p.exists() else None
+    meta = {"profile_sha256": short_hash(a.profile), "evidence_sha256": short_hash(a.evidence),
+            "labels_sha256": short_hash(a.labels), "date": stamp, "labelled": len(gold_rel), "skipped": skipped, "positives": sum(gold_rel.values()),
             "sources": sources,
             "model": model_id, "repeats": a.repeats, "batch_size": a.batch_size}
     out.mkdir(parents=True, exist_ok=True)
