@@ -21,7 +21,7 @@ How often does a screening system agree with your own judgement about which jobs
 
    Hand-picked adverts are likelier to be relevant, so the report shows how many adverts, and how many relevant ones, came from each source. Use them to top up good matches, not to replace the board sample.
 
-2. **Label it yourself** in `eval/data/labels.csv` (Excel, Numbers or any editor; save as CSV). Label before you look at any system's output, so the labels are not influenced by it.
+2. **Label it yourself**, either with the local labelling page (`python3 eval/label.py`, then open http://127.0.0.1:8780; it shows each advert's full text, saves every click to `labels.csv` and keeps a backup) or directly in `eval/data/labels.csv` (Excel, Numbers or any editor; save as CSV). Label before you look at any system's output, so the labels are not influenced by it.
 
    - `relevant`: `yes` if you would want this job on your shortlist (field, level and location all acceptable), otherwise `no`.
    - `fit`: 1 to 5 for every row, using the rubric below, judged on what the advert asks for against what you can show.

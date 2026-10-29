@@ -445,6 +445,27 @@ class Collect(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_labelling_page_saves_one_row_and_keeps_the_rest(self):
+        import label as LB
+        tmp = Path(tempfile.mkdtemp(prefix="seekcrew_label_"))
+        try:
+            ads = tmp / "a.jsonl"
+            ads.write_text(json.dumps({"id": "j1", "company": "A", "title": "T1", "location": "D", "url": "u1", "text": "x1", "source": "greenhouse"}) + "\n"
+                           + json.dumps({"id": "j2", "company": "B", "title": "T2", "location": "D", "url": "u2", "text": "x2", "source": "manual"}) + "\n")
+            lab = tmp / "labels.csv"
+            lab.write_text("id,company,title,location,url,relevant,fit,notes\nj1,A,T1,D,u1,no,1,keep me\nj2,B,T2,D,u2,,,\n")
+            out = LB.save_label(lab, "j2", relevant="yes", fit="4", notes="good\nmatch")
+            self.assertEqual(out, {"saved": "j2", "done": 2, "total": 2})
+            items = LB.load_items(ads, lab)
+            self.assertEqual([(x["relevant"], x["fit"], x["notes"]) for x in items], [("no", "1", "keep me"), ("yes", "4", "good match")])
+            self.assertEqual(items[1]["text"], "x2")
+            with self.assertRaises(ValueError):
+                LB.save_label(lab, "j1", fit="9")
+            with self.assertRaises(KeyError):
+                LB.save_label(lab, "nope", relevant="yes")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_sample_is_seeded_and_mixed(self):
         import collect as C
         pool = [{"id": "t%d" % i, "title": "ML Engineer"} for i in range(40)] + [{"id": "o%d" % i, "title": "Sales Lead"} for i in range(40)]
