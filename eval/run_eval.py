@@ -99,7 +99,7 @@ def score(decisions, gold_rel, gold_fit, evidence_text=None):
 
 
 def process_of(summary):
-    keys = ["models_used", "usage", "cost_usd", "seconds", "tool_error_rate", "tool_calls", "tool_errors", "reads", "jobs_read",
+    keys = ["agent_version", "ungrounded_rejected", "models_used", "usage", "cost_usd", "seconds", "tool_error_rate", "tool_calls", "tool_errors", "reads", "jobs_read",
             "reminders", "revisions", "model_retries", "stop", "undecided"]
     return {k: summary.get(k) for k in keys}
 
@@ -164,6 +164,10 @@ def report_md(meta, systems):
                 for mdl, c in (p.get("models_used") or {}).items():
                     used.setdefault(n, {}).setdefault(mdl, 0)
                     used[n][mdl] += c
+        vers = sorted({str(p.get("agent_version")) for s in proc.values() for p in s["process"] if p.get("agent_version")})
+        rej = {n: [p.get("ungrounded_rejected", 0) for p in s["process"]] for n, s in proc.items()}
+        L += ["", "Agent version: %s. Evidence quotes rejected during the run for not being in the evidence bank: %s" % (
+            ", ".join(vers) or "n/a", "; ".join("%s: %s" % (n, ", ".join(map(str, v))) for n, v in rej.items()))]
         L += ["", "Models that answered: " + "; ".join("%s: %s" % (n, ", ".join("%s (%d calls)" % kv for kv in v.items())) for n, v in used.items())]
         L += ["", "Stop reasons: " + "; ".join("%s: %s" % (n, ", ".join(v)) for n, v in stops.items())]
     L += ["", "## Notes", "",

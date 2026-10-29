@@ -19,6 +19,7 @@ import time
 import uuid
 from pathlib import Path
 
+from . import __version__
 from .model import ModelError
 from .tools import SCHEMAS, ToolError, Toolbox
 
@@ -36,7 +37,7 @@ Rules:
 - relevant = true only if this person would reasonably want this job on their shortlist, given the scope, level and location in the profile.
 - Use read_job when the title and location are not enough to decide. Skip reading only when the title alone clearly rules a job out.
 - Before marking a job relevant, call check_duplicate and pass its verdict in record_decision. A DUPLICATE job is still recorded, with relevant = false and the reason "already applied or tracked".
-- evidence must be short quotes copied from the EVIDENCE BANK, not paraphrases. Leave it empty when nothing supports the fit.
+- evidence must be short quotes copied word for word from the EVIDENCE BANK, not paraphrases, and never text from the advert. A requirement the advert asks for is not evidence. Leave evidence empty when nothing in the evidence bank supports the fit. Quotes that are not in the evidence bank are rejected.
 - Record exactly one decision per job, then call finish. Do not write a report in text.
 
 {rubric}
@@ -64,6 +65,7 @@ class RunState:
         self.tool_calls = {}       # name -> count
         self.tool_errors = {}      # name -> count
         self.reminders = 0
+        self.ungrounded_rejected = 0  # evidence quotes refused because they are not in the evidence bank
         self.stop = None
         self.batches_done = 0
         self.models_used = {}      # model that actually answered -> number of calls
@@ -158,10 +160,10 @@ def run(jobs, profile, evidence, model, limits=None, workspace=None, run_dir=Non
     else:
         state = RunState(uuid.uuid4().hex[:12], state_path)
     trace = Trace(run_dir / "trace.jsonl" if run_dir else None)
-    tb = Toolbox(jobs, state, **({"workspace": workspace} if workspace else {}))
+    tb = Toolbox(jobs, state, evidence_text=evidence, **({"workspace": workspace} if workspace else {}))
     system = build_system(profile, evidence)
     started = clock()
-    trace("run_start", run_id=state.run_id, model=getattr(model, "model", "?"), jobs=len(jobs), resume=resume)
+    trace("run_start", run_id=state.run_id, agent_version=__version__, model=getattr(model, "model", "?"), jobs=len(jobs), resume=resume)
 
     todo = [j for j in jobs if j["id"] not in state.decisions]
     batches = [todo[i:i + limits.batch_size] for i in range(0, len(todo), limits.batch_size)]
@@ -244,7 +246,7 @@ def run(jobs, profile, evidence, model, limits=None, workspace=None, run_dir=Non
 
     undecided = [j["id"] for j in jobs if j["id"] not in state.decisions]
     summary = {
-        "run_id": state.run_id, "model": getattr(model, "model", "?"),
+        "run_id": state.run_id, "agent_version": __version__, "model": getattr(model, "model", "?"),
         "jobs": len(jobs), "decided": len(jobs) - len(undecided), "undecided": undecided,
         "relevant": sorted(i for i, d in state.decisions.items() if d["relevant"]),
         "stop": state.stop or "completed", "models_used": dict(state.models_used),
@@ -253,6 +255,7 @@ def run(jobs, profile, evidence, model, limits=None, workspace=None, run_dir=Non
         "tool_error_rate": round(sum(state.tool_errors.values()) / max(1, sum(state.tool_calls.values())), 4),
         "reads": sum(state.reads.values()), "jobs_read": len(state.reads), "revisions": state.revisions,
         "reminders": state.reminders, "model_retries": getattr(model, "retries", 0),
+        "ungrounded_rejected": getattr(state, "ungrounded_rejected", 0),
         "seconds": round(clock() - started, 2), "decisions": state.decisions,
     }
     trace("run_end", **{k: v for k, v in summary.items() if k != "decisions"})

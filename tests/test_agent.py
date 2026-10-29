@@ -140,6 +140,22 @@ class Loop(Base):
         self.assertEqual(s2["run_id"], s1["run_id"])
         self.assertNotIn("j1", m2.calls[0]["messages"][0]["content"])
 
+    def test_evidence_must_come_from_the_evidence_bank(self):
+        bank_quote = "Built a vision-language model"
+        m = ScriptedModel([tool_use(*decide("j1", evidence=["Hands-on experience with large language models"])),
+                           tool_use(*decide("j1", evidence=["Python"])),
+                           tool_use([decide("j1", evidence=["built a Vision-Language model!"]), decide("j2", False, 1), decide("j3", True, 3)], None),
+                           tool_use("finish", {"summary": "ok"})])
+        s = self.go(m)
+        self.assertEqual(s["stop"], "completed")
+        self.assertEqual(s["tool_errors"], {"record_decision": 2})
+        self.assertEqual(s["ungrounded_rejected"], 2)
+        self.assertEqual(s["decisions"]["j1"]["evidence"], ["built a Vision-Language model!"])
+        first_error = m.calls[1]["messages"][-1]["content"][0]["content"]
+        self.assertIn("not in the evidence bank", first_error)
+        self.assertIn("too short", m.calls[2]["messages"][-1]["content"][0]["content"])
+        self.assertEqual(s["agent_version"].split()[0], "0.2.0")
+
     def test_duplicate_check_uses_the_workspace_tracker(self):
         (self.tmp / "tracker.csv").write_text("ID,Company,Role,Job link,Status\n1,Acme,Machine Learning Scientist,https://acme.example/1,Applied\n")
         m = ScriptedModel([tool_use("check_duplicate", {"employer": "Acme", "role": "Machine Learning Scientist", "url": "https://acme.example/1"}),

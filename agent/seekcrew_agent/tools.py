@@ -6,6 +6,7 @@ counts it as a tool-call failure in the run summary.
 """
 import importlib.util
 import os
+import re
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -13,6 +14,14 @@ REPO = Path(__file__).resolve().parents[2]
 
 class ToolError(Exception):
     pass
+
+
+MIN_QUOTE = 15  # characters; shorter "quotes" (a single skill name) prove nothing
+
+
+def normalise(text):
+    """Lower case, punctuation and spacing removed, so a quote matches despite formatting differences."""
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9%.+# ]", " ", (text or "").lower())).strip()
 
 
 SCHEMAS = [
@@ -60,8 +69,9 @@ def _load_app_tools(root):
 
 
 class Toolbox:
-    def __init__(self, jobs, state, workspace=REPO, max_chars=6000):
+    def __init__(self, jobs, state, workspace=REPO, max_chars=6000, evidence_text=None):
         self.jobs = {j["id"]: j for j in jobs}
+        self.bank = normalise(evidence_text) if evidence_text is not None else None
         self.state = state
         self.max_chars = max_chars
         self.batch = list(self.jobs)
@@ -119,6 +129,19 @@ class Toolbox:
         evidence = evidence or []
         if not isinstance(evidence, list) or not all(isinstance(e, str) for e in evidence) or len(evidence) > 5:
             raise ToolError("evidence must be a list of at most 5 strings.")
+        if self.bank is not None:
+            bad = []
+            for n, q in enumerate(evidence, 1):
+                nq = normalise(q)
+                if len(nq) < MIN_QUOTE:
+                    bad.append("quote %d is too short to be evidence (%r)" % (n, q[:60]))
+                elif nq not in self.bank:
+                    bad.append("quote %d is not in the evidence bank (%r)" % (n, q[:120]))
+            if bad:
+                self.state.ungrounded_rejected += len(bad)
+                raise ToolError("Decision not recorded: %s. Evidence must be copied word for word from the EVIDENCE BANK "
+                                "section, never from the advert. Remove or correct these quotes; use an empty list if "
+                                "nothing in the evidence bank supports the fit." % "; ".join(bad))
         if duplicate not in ("NEW", "POSSIBLE", "DUPLICATE", "NOT_CHECKED"):
             raise ToolError("duplicate must be NEW, POSSIBLE, DUPLICATE or NOT_CHECKED.")
         revised = job_id in self.state.decisions

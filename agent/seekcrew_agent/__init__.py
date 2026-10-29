@@ -2,4 +2,4 @@
 
 Standard library only. See agent/README.md.
 """
-__version__ = "0.1.0"
+__version__ = "0.2.0"  # 0.2: evidence quotes must be found in the evidence bank

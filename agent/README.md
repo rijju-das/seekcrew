@@ -49,7 +49,7 @@ adverts ─► batches of 8 ─► per batch: fresh conversation ─► model �
 | Free models | Refused. Free OpenRouter endpoints may train on or publish prompts, and the agent sends your profile and evidence bank. A run also stops if OpenRouter answers with a free model |
 | Tracing | Each model call prints which model answered (`Batch 1 step 2 answered by ...`) and the run ends with a count per model. JSON lines per model call (model that answered, latency, tokens, stop reason) and per tool call (arguments, success, error) |
 | Service | `serve.py`: `POST /runs`, `GET /runs/<id>`, `GET /health`; one run at a time; binds to 127.0.0.1 only |
-| Grounding | The prompt requires evidence to be quoted from the evidence bank; the evaluation measures how many quotes really are |
+| Grounding | Since 0.2.0, `record_decision` refuses any evidence quote that is not found word for word (ignoring case, punctuation and spacing) in the evidence bank, or that is shorter than 15 characters, and tells the model to correct it. Version 0.1.0 only asked for this in the prompt, and the first evaluation found 2 of 17 quotes copied from adverts instead. The evaluation still measures grounding and counts rejected quotes |
 
 ## Limits
 
