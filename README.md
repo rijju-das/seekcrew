@@ -34,7 +34,7 @@ It runs on your own computer, in your own Claude Code, on your own files. There 
 
 ## Quick start
 
-You need Python 3.8+ and Claude Code.
+You need Python 3.10 or newer and Claude Code.
 
 ```bash
 git clone https://github.com/<you>/seekcrew.git

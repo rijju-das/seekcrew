@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Duplicate check, folder creation and tracker rows for job applications.
 
-Used by the Claude Code agents in this repository. Python 3.8+, standard library only.
+Used by the Claude Code agents in this repository. Python 3.10 or newer, standard library only.
 
   python3 tools/app_tools.py init
   python3 tools/app_tools.py check --employer "Acme Ltd" --role "Applied Scientist" \
