@@ -17,7 +17,7 @@ sys.path.insert(0, str(REPO / "agent"))
 sys.path.insert(0, str(REPO / "eval"))
 
 from seekcrew_agent.loop import Limits, memory_digest, run  # noqa: E402
-from seekcrew_agent.model import AnthropicModel, ModelError, ScriptedModel, text_reply, tool_use  # noqa: E402
+from seekcrew_agent.model import AnthropicModel, ModelError, OpenAICompatModel, ScriptedModel, make_model, text_reply, tool_use  # noqa: E402
 from seekcrew_agent.dry import DryRunModel  # noqa: E402
 
 JOBS = [{"id": "j1", "company": "Acme", "title": "Machine Learning Scientist", "location": "Dublin", "url": "https://acme.example/1", "text": "ML role"},
@@ -213,6 +213,87 @@ class Client(unittest.TestCase):
     def test_missing_model_or_key_fails_fast(self):
         with self.assertRaises(ModelError):
             AnthropicModel("", api_key="k")
+
+
+class OpenRouter(Base):
+    def oa_reply(self, tool_calls=None, content=None, finish="tool_calls", cost=0.001):
+        msg = {"role": "assistant", "content": content}
+        if tool_calls:
+            msg["tool_calls"] = [{"id": "call_%d" % i, "type": "function",
+                                  "function": {"name": n, "arguments": a if isinstance(a, str) else json.dumps(a)}}
+                                 for i, (n, a) in enumerate(tool_calls)]
+        return {"choices": [{"message": msg, "finish_reason": finish}],
+                "usage": {"prompt_tokens": 100, "completion_tokens": 20, "cost": cost}}
+
+    def model(self, replies, sent=None, sleeps=None):
+        seq = list(replies)
+
+        def opener(req, timeout):
+            self.assertEqual(req.get_header("Authorization"), "Bearer k")
+            if sent is not None:
+                sent.append(json.loads(req.data))
+            r = seq.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return FakeResp(json.dumps(r).encode())
+        return OpenAICompatModel("vendor/model", api_key="k", opener=opener,
+                                 sleep=(sleeps.append if sleeps is not None else (lambda s: None)))
+
+    def test_full_run_through_translation_with_reported_cost(self):
+        sent = []
+        m = self.model([self.oa_reply([("record_decision", {"job_id": "j1", "relevant": True, "fit": 4, "reason": "r"}),
+                                       ("record_decision", {"job_id": "j2", "relevant": False, "fit": 1, "reason": "r"}),
+                                       ("record_decision", "{not json")]),
+                        self.oa_reply([("record_decision", {"job_id": "j3", "relevant": True, "fit": 3, "reason": "r"})]),
+                        self.oa_reply([("finish", {"summary": "ok"})])], sent=sent)
+        s = self.go(m)
+        self.assertEqual(s["stop"], "completed")
+        self.assertEqual(s["relevant"], ["j1", "j3"])
+        self.assertEqual(s["tool_errors"], {"record_decision": 1})  # the unparsable call
+        self.assertAlmostEqual(s["cost_usd"], 0.003)
+        second = sent[1]["messages"]
+        self.assertEqual(second[0]["role"], "system")
+        self.assertEqual(second[2]["role"], "assistant")
+        self.assertEqual(len(second[2]["tool_calls"]), 3)
+        tool_msgs = [x for x in second if x["role"] == "tool"]
+        self.assertEqual([x["tool_call_id"] for x in tool_msgs], ["call_0", "call_1", "call_2"])
+        self.assertTrue(tool_msgs[2]["content"].startswith("ERROR: "))
+        self.assertEqual(sent[0]["tools"][0]["type"], "function")
+        self.assertIn("parameters", sent[0]["tools"][0]["function"])
+
+    def test_reported_cost_enforces_the_cap_without_prices(self):
+        m = self.model([self.oa_reply([("record_decision", {"job_id": "j1", "relevant": True, "fit": 4, "reason": "r"})], cost=0.6)])
+        s = self.go(m, limits=Limits(batch_size=1, max_cost_usd=0.5))
+        self.assertEqual(s["stop"], "cost_budget")
+
+    def test_rate_limit_retried_credits_error_not(self):
+        sleeps = []
+        m = self.model([http_error(429, "1"), {"error": {"code": 502, "message": "provider down"}}, self.oa_reply(content="hi", finish="stop")], sleeps=sleeps)
+        out = m.create("s", [{"role": "user", "content": "x"}], [])
+        self.assertEqual(out["stop_reason"], "end_turn")
+        self.assertEqual(m.retries, 2)
+        self.assertEqual(sleeps[0], 1.0)
+        m2 = self.model([http_error(402)])
+        with self.assertRaises(ModelError) as cm:
+            m2.create("s", [{"role": "user", "content": "x"}], [])
+        self.assertIn("402", str(cm.exception))
+        self.assertEqual(m2.retries, 0)
+
+    def test_provider_choice(self):
+        import os
+        old = {k: os.environ.pop(k, None) for k in ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "SEEKCREW_PROVIDER")}
+        try:
+            os.environ["OPENROUTER_API_KEY"] = "k"
+            self.assertIsInstance(make_model(None, "a/b"), OpenAICompatModel)
+            os.environ["ANTHROPIC_API_KEY"] = "k"
+            self.assertIsInstance(make_model("anthropic", "m"), AnthropicModel)
+            with self.assertRaises(ModelError):
+                make_model("other", "m")
+        finally:
+            for k, v in old.items():
+                os.environ.pop(k, None)
+                if v is not None:
+                    os.environ[k] = v
 
 
 class Service(Base):

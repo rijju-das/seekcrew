@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the Seekcrew agent as a small local HTTP service (127.0.0.1 only, standard library).
 
-    export ANTHROPIC_API_KEY=... SEEKCREW_MODEL=<model id>
+    export OPENROUTER_API_KEY=... SEEKCREW_MODEL=<provider/model>   (or ANTHROPIC_API_KEY with --provider anthropic)
     python3 agent/serve.py --port 8770 [--dry-run] [--max-cost 2 --price-in X --price-out Y]
 
     GET  /health            service status
@@ -29,7 +29,7 @@ REPO = HERE.parent
 from cli import dry_settings, load_jobs  # noqa: E402
 from seekcrew_agent.dry import DryRunModel  # noqa: E402
 from seekcrew_agent.loop import Limits, run  # noqa: E402
-from seekcrew_agent.model import AnthropicModel, ModelError  # noqa: E402
+from seekcrew_agent.model import AnthropicModel, ModelError, make_model  # noqa: E402
 
 MAX_BODY = 5_000_000
 
@@ -121,6 +121,7 @@ def make_handler(svc, info):
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Seekcrew agent as a local HTTP service")
     ap.add_argument("--port", type=int, default=8770)
+    ap.add_argument("--provider", default=None)
     ap.add_argument("--model", default=os.environ.get("SEEKCREW_MODEL"))
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--batch-size", type=int, default=8)
@@ -132,16 +133,17 @@ def main(argv=None):
     ap.add_argument("--workspace", default=str(REPO))
     ap.add_argument("--out", default=str(REPO / "runs"))
     a = ap.parse_args(argv)
-    if a.max_cost is not None and (a.price_in is None or a.price_out is None):
-        raise SystemExit("--max-cost needs --price-in and --price-out")
     if a.dry_run:
         make_model = lambda: DryRunModel(**dry_settings())  # noqa: E731
     else:
         try:
-            AnthropicModel(a.model)  # fail fast on a missing key or model
+            first = make_model(a.provider, a.model)  # fail fast on a missing key or model
         except ModelError as e:
             raise SystemExit(str(e))
-        make_model = lambda: AnthropicModel(a.model)  # noqa: E731
+        if isinstance(first, AnthropicModel) and a.max_cost is not None and (a.price_in is None or a.price_out is None):
+            raise SystemExit("With the Anthropic API, --max-cost needs --price-in and --price-out")
+        build = make_model
+        make_model = lambda: build(a.provider, a.model)  # noqa: E731
     for p in (a.profile, a.evidence):
         if not Path(p).exists():
             raise SystemExit("%s not found" % p)

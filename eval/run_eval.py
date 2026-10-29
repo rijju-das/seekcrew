@@ -2,8 +2,8 @@
 """Evaluate job screening against your own labels.
 
     python3 eval/run_eval.py --systems baseline,dry                       # free: checks the pipeline
-    python3 eval/run_eval.py --systems baseline,agent --repeats 3 \\
-        --max-cost 3 --price-in <$/MTok> --price-out <$/MTok>             # needs ANTHROPIC_API_KEY and SEEKCREW_MODEL
+    python3 eval/run_eval.py --systems baseline,agent --repeats 3 --max-cost 2   # needs OPENROUTER_API_KEY and SEEKCREW_MODEL
+    (with --provider anthropic and ANTHROPIC_API_KEY, also pass --price-in and --price-out)
     python3 eval/run_eval.py --systems baseline --import claude_code=path/to/decisions.json
 
 Systems
@@ -41,7 +41,7 @@ sys.path.insert(0, str(REPO / "agent"))
 import metrics as M  # noqa: E402
 from seekcrew_agent.dry import DryRunModel  # noqa: E402
 from seekcrew_agent.loop import Limits, run  # noqa: E402
-from seekcrew_agent.model import AnthropicModel, ModelError  # noqa: E402
+from seekcrew_agent.model import AnthropicModel, ModelError, make_model  # noqa: E402
 
 YES = {"yes", "y", "true", "1", "relevant"}
 NO = {"no", "n", "false", "0", "not relevant"}
@@ -145,7 +145,7 @@ def report_md(meta, systems):
     proc = {n: s for n, s in systems.items() if s.get("process")}
     if proc:
         L += ["", "## Process (per run)", "",
-              "| System | Model calls | Tokens in | Tokens out | Est. cost $ | Seconds | Tool error rate | Adverts read | Evidence quotes grounded | Stability |",
+              "| System | Model calls | Tokens in | Tokens out | Cost $ | Seconds | Tool error rate | Adverts read | Evidence quotes grounded | Stability |",
               "|---|---|---|---|---|---|---|---|---|---|"]
         for name, s in proc.items():
             p = s["process"]
@@ -162,7 +162,7 @@ def report_md(meta, systems):
           "- Undecided jobs count as not relevant for precision and recall; coverage shows how many were decided.",
           "- The 95% interval resamples the labelled jobs (2,000 bootstrap samples) and reflects the small sample.",
           "- The sample was drawn with a fixed seed from public job boards and mixes technical and non-technical titles, which makes the keyword baseline look better than on an unfiltered feed.",
-          "- Cost is an estimate from the token counts and the prices passed in; check it against the Anthropic console."]
+          "- Cost is the provider-reported cost when available (OpenRouter), otherwise an estimate from token counts and the prices passed in. Check it against your provider's dashboard."]
     return "\n".join(L) + "\n"
 
 
@@ -173,6 +173,7 @@ def main(argv=None):
     ap.add_argument("--systems", default="baseline,dry")
     ap.add_argument("--import", dest="imports", action="append", default=[], help="NAME=decisions.json")
     ap.add_argument("--repeats", type=int, default=3)
+    ap.add_argument("--provider", default=None, help="openrouter or anthropic")
     ap.add_argument("--model", default=None)
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--max-cost", type=float, default=None, help="cost cap per agent run, US$")
@@ -203,8 +204,6 @@ def main(argv=None):
             if not Path(p).exists():
                 raise SystemExit("%s not found" % p)
         profile, evidence = Path(a.profile).read_text(), Path(a.evidence).read_text()
-    if "agent" in names and a.max_cost is not None and (a.price_in is None or a.price_out is None):
-        raise SystemExit("--max-cost needs --price-in and --price-out")
 
     systems, model_id = {}, None
     for name in names:
@@ -217,9 +216,11 @@ def main(argv=None):
                     model = DryRunModel(**keyword_settings())
                 else:
                     try:
-                        model = AnthropicModel(a.model or os.environ.get("SEEKCREW_MODEL"))
+                        model = make_model(a.provider, a.model)
                     except ModelError as e:
                         raise SystemExit(str(e))
+                    if isinstance(model, AnthropicModel) and a.max_cost is not None and (a.price_in is None or a.price_out is None):
+                        raise SystemExit("With the Anthropic API, --max-cost needs --price-in and --price-out")
                     model_id = model.model
                 limits = Limits(batch_size=a.batch_size, max_cost_usd=a.max_cost,
                                 price_in_per_mtok=a.price_in, price_out_per_mtok=a.price_out)

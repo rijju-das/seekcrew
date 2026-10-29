@@ -35,14 +35,13 @@ How often does a screening system agree with your own judgement about which jobs
 
    `dry` drives the real agent loop and tools with the keyword rule; it must score exactly like `baseline` (the run prints PASS).
 
-4. **Evaluate the agent** (needs `ANTHROPIC_API_KEY` and `SEEKCREW_MODEL`; costs money):
+4. **Evaluate the agent** (needs `OPENROUTER_API_KEY` and `SEEKCREW_MODEL`; costs money):
 
    ```bash
-   python3 eval/run_eval.py --systems baseline,agent --repeats 3 \
-       --max-cost 2 --price-in <US$ per M input tokens> --price-out <US$ per M output tokens>
+   python3 eval/run_eval.py --systems baseline,agent --repeats 3 --max-cost 2
    ```
 
-   `--max-cost` caps each run. Start with `--repeats 1` to see the cost of one run.
+   `--max-cost` caps each run, using the cost OpenRouter reports. Start with `--repeats 1` to see the cost of one run. To compare models, run it once per model (change `SEEKCREW_MODEL`). With the Anthropic API instead, add `--provider anthropic --price-in <US$/M> --price-out <US$/M>`.
 
 5. **Compare other systems** by exporting their decisions as `{"job_id": {"relevant": true, "fit": 4}}` and adding `--import name=file.json` (for example the Claude Code job-scout's decisions on the same adverts).
 

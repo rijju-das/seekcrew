@@ -135,6 +135,8 @@ class Limits:
         self.max_reminders = max_reminders
 
     def cost(self, usage):
+        if usage.get("cost_reported") is not None:
+            return usage["cost_reported"]
         if self.price_in is None or self.price_out is None:
             return None
         return usage["input_tokens"] / 1e6 * self.price_in + usage["output_tokens"] / 1e6 * self.price_out
@@ -179,6 +181,8 @@ def run(jobs, profile, evidence, model, limits=None, workspace=None, run_dir=Non
             state.usage["input_tokens"] += int(u.get("input_tokens", 0))
             state.usage["output_tokens"] += int(u.get("output_tokens", 0))
             state.usage["model_calls"] += 1
+            if u.get("cost") is not None:  # real cost reported by the provider (OpenRouter)
+                state.usage["cost_reported"] = state.usage.get("cost_reported", 0.0) + float(u["cost"])
             trace("model_call", step=step, ms=round((clock() - t0) * 1000), stop_reason=resp.get("stop_reason"),
                   input_tokens=u.get("input_tokens"), output_tokens=u.get("output_tokens"))
             content = resp.get("content") or [{"type": "text", "text": "(no output)"}]
