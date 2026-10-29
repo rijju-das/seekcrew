@@ -279,6 +279,33 @@ class OpenRouter(Base):
         self.assertIn("402", str(cm.exception))
         self.assertEqual(m2.retries, 0)
 
+    def test_free_models_are_refused(self):
+        for mid in ("openrouter/free", "vendor/some-model:free", "OpenRouter/Free"):
+            with self.assertRaises(ModelError) as cm:
+                OpenAICompatModel(mid, api_key="k")
+            self.assertIn("Free models are not allowed", str(cm.exception))
+        reply = self.oa_reply(content="hi", finish="stop")
+        reply["model"] = "vendor/other:free"
+        m = self.model([reply])
+        with self.assertRaises(ModelError) as cm:
+            m.create("s", [{"role": "user", "content": "x"}], [])
+        self.assertIn("free model", str(cm.exception))
+
+    def test_answering_model_is_recorded_and_shown(self):
+        r1 = self.oa_reply([("record_decision", {"job_id": "j1", "relevant": True, "fit": 4, "reason": "r"}),
+                            ("record_decision", {"job_id": "j2", "relevant": False, "fit": 1, "reason": "r"}),
+                            ("record_decision", {"job_id": "j3", "relevant": True, "fit": 3, "reason": "r"})])
+        r1["model"] = "vendor/model-a"
+        r2 = self.oa_reply([("finish", {"summary": "ok"})])
+        r2["model"] = "vendor/model-a"
+        lines = []
+        s = self.go(self.model([r1, r2]), show=lines.append)
+        self.assertEqual(s["models_used"], {"vendor/model-a": 2})
+        self.assertEqual(len(lines), 2)
+        self.assertIn("answered by vendor/model-a (3 tool calls", lines[0])
+        events = [json.loads(l) for l in (self.tmp / "run" / "trace.jsonl").read_text().splitlines()]
+        self.assertEqual([e["answered_by"] for e in events if e["kind"] == "model_call"], ["vendor/model-a"] * 2)
+
     def test_provider_choice(self):
         import os
         old = {k: os.environ.pop(k, None) for k in ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "SEEKCREW_PROVIDER")}

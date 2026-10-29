@@ -117,6 +117,12 @@ OPENAI_RETRY_STATUS = {408, 429, 500, 502, 503, 504}
 STOP_MAP = {"tool_calls": "tool_use", "stop": "end_turn", "length": "max_tokens"}
 
 
+def is_free_model(model_id):
+    """Free OpenRouter endpoints may train on or publish prompts, so they never get the user's profile."""
+    m = (model_id or "").strip().lower()
+    return m.endswith(":free") or m == "openrouter/free" or m.startswith("openrouter/free")
+
+
 class OpenAICompatModel:
     """Chat Completions client for OpenRouter (or any OpenAI-compatible endpoint).
 
@@ -129,6 +135,9 @@ class OpenAICompatModel:
                  max_retries=4, opener=None, sleep=time.sleep, title="Seekcrew"):
         if not model:
             raise ModelError("No model ID. Set SEEKCREW_MODEL or pass --model (OpenRouter IDs look like provider/model, see openrouter.ai/models).")
+        if is_free_model(model):
+            raise ModelError("Free models are not allowed: their providers may train on or publish prompts, and Seekcrew sends "
+                             "your profile and evidence bank. Choose a paid model ID (without ':free').")
         self.model = model
         self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
         if not self.api_key:
@@ -195,7 +204,7 @@ class OpenAICompatModel:
             usage["cost"] = float(u["cost"])
         fr = ch.get("finish_reason")
         stop = "tool_use" if any(b["type"] == "tool_use" for b in content) else STOP_MAP.get(fr, fr or "end_turn")
-        return {"content": content, "stop_reason": stop, "usage": usage}
+        return {"content": content, "stop_reason": stop, "usage": usage, "model": resp.get("model")}
 
     # ---------------------------------------------------------------- call
     def create(self, system, messages, tools):
@@ -213,7 +222,10 @@ class OpenAICompatModel:
                     data = json.loads(r.read().decode("utf-8"))
                 err = data.get("error") if isinstance(data, dict) else None
                 if not err:
-                    return self.from_openai(data)
+                    out = self.from_openai(data)
+                    if is_free_model(out.get("model")):
+                        raise ModelError("OpenRouter answered with a free model (%s). Stopped so your profile is not sent to free endpoints." % out["model"])
+                    return out
                 code = err.get("code") if isinstance(err.get("code"), int) else 502
                 if code not in OPENAI_RETRY_STATUS or attempt >= self.max_retries:
                     raise ModelError("Provider error %s: %s" % (code, str(err.get("message", ""))[:300]))

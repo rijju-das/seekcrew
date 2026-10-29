@@ -57,7 +57,8 @@ class Service:
         try:
             run_dir = self.out / ("%s_service_%s" % (datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"), rid))
             s = run(jobs, self.profile, self.evidence, self.make_model(), self.limits,
-                    workspace=self.workspace, run_dir=run_dir)
+                    workspace=self.workspace, run_dir=run_dir,
+                    show=lambda line: sys.stderr.write("[agent %s] %s\n" % (rid, line)))
             self.runs[rid].update(status="done", summary=s, folder=str(run_dir))
         except Exception as e:  # report, never crash the server
             self.runs[rid].update(status="failed", error="%s: %s" % (type(e).__name__, e))

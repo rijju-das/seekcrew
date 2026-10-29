@@ -93,13 +93,15 @@ def main(argv=None):
                                                        "batch_size": a.batch_size, "dry_run": a.dry_run}, indent=1))
     limits = Limits(batch_size=a.batch_size, max_total_tokens=a.max_tokens_total, max_cost_usd=a.max_cost,
                     price_in_per_mtok=a.price_in, price_out_per_mtok=a.price_out)
-    s = run(jobs, profile, evidence, model, limits, workspace=a.workspace, run_dir=run_dir, resume=bool(a.resume))
+    print("Model requested: %s" % model.model)
+    s = run(jobs, profile, evidence, model, limits, workspace=a.workspace, run_dir=run_dir, resume=bool(a.resume), show=print)
     label = "cost" if s["usage"].get("cost_reported") is not None else "est. cost"
     cost = "" if s["cost_usd"] is None else ", %s $%.4f" % (label, s["cost_usd"])
     print("Run %s (%s): %d/%d jobs decided, %d relevant, stop=%s" % (s["run_id"], s["model"], s["decided"], s["jobs"], len(s["relevant"]), s["stop"]))
     print("Model calls %d, tokens in %d / out %d%s, tool errors %d of %d calls, %.1fs" % (
         s["usage"]["model_calls"], s["usage"]["input_tokens"], s["usage"]["output_tokens"], cost,
         sum(s["tool_errors"].values()), sum(s["tool_calls"].values()), s["seconds"]))
+    print("Answered by: " + ", ".join("%s (%d calls)" % kv for kv in s["models_used"].items()))
     print("Saved to %s" % run_dir)
     return 0 if s["stop"] == "completed" else 1
 

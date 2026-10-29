@@ -55,6 +55,8 @@ How often does a screening system agree with your own judgement about which jobs
 | Grounding | Share of evidence quotes that appear verbatim (after normalising case and punctuation) in your evidence bank |
 | Stability | Agreement of relevant/not-relevant calls between repeated runs |
 
+Each agent run prints which model answered every call, and the report lists the models that answered, so you can confirm one model produced the results. Free models are refused.
+
 Results go to `eval/results/<date>/report.md` and `results.json` (metrics only, no advert text). Per-job decisions stay in `runs/`.
 
 ## Reading the results honestly

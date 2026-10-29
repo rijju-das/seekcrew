@@ -99,7 +99,7 @@ def score(decisions, gold_rel, gold_fit, evidence_text=None):
 
 
 def process_of(summary):
-    keys = ["usage", "cost_usd", "seconds", "tool_error_rate", "tool_calls", "tool_errors", "reads", "jobs_read",
+    keys = ["models_used", "usage", "cost_usd", "seconds", "tool_error_rate", "tool_calls", "tool_errors", "reads", "jobs_read",
             "reminders", "revisions", "model_retries", "stop", "undecided"]
     return {k: summary.get(k) for k in keys}
 
@@ -157,6 +157,13 @@ def report_md(meta, systems):
                 mean_sd([x.get("evidence", {}).get("grounded") for x in s["runs"]]),
                 fmt(s.get("stability")) if s.get("stability") is not None else "n/a"))
         stops = {n: [x["stop"] for x in s["process"]] for n, s in proc.items()}
+        used = {}
+        for n, s in proc.items():
+            for p in s["process"]:
+                for mdl, c in (p.get("models_used") or {}).items():
+                    used.setdefault(n, {}).setdefault(mdl, 0)
+                    used[n][mdl] += c
+        L += ["", "Models that answered: " + "; ".join("%s: %s" % (n, ", ".join("%s (%d calls)" % kv for kv in v.items())) for n, v in used.items())]
         L += ["", "Stop reasons: " + "; ".join("%s: %s" % (n, ", ".join(v)) for n, v in stops.items())]
     L += ["", "## Notes", "",
           "- Undecided jobs count as not relevant for precision and recall; coverage shows how many were decided.",
@@ -224,8 +231,10 @@ def main(argv=None):
                     model_id = model.model
                 limits = Limits(batch_size=a.batch_size, max_cost_usd=a.max_cost,
                                 price_in_per_mtok=a.price_in, price_out_per_mtok=a.price_out)
+                print("%s run %d: model requested %s" % (name, k + 1, model.model))
                 s = run(jobs, profile, evidence, model, limits, workspace=workspace,
-                        run_dir=runs_root / ("%s_%d" % (name, k + 1)))
+                        run_dir=runs_root / ("%s_%d" % (name, k + 1)), show=print if name == "agent" else None)
+                print("%s run %d answered by: %s" % (name, k + 1, ", ".join("%s (%d calls)" % kv for kv in s["models_used"].items())))
                 runs.append(score(s["decisions"], gold_rel, gold_fit, evidence))
                 procs.append(process_of(s))
                 rel_runs.append({i: d["relevant"] for i, d in s["decisions"].items()})

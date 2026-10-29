@@ -40,7 +40,8 @@ adverts ─► batches of 8 ─► per batch: fresh conversation ─► model �
 | Errors | Rate limits, overload and network errors are retried with exponential backoff, honouring `retry-after`; other API errors stop the run cleanly. A model that stops without tools is reminded at most twice, then the batch is left undecided rather than guessed |
 | Budgets | Steps per batch, total tokens and (when prices are given) estimated cost. Hitting a limit stops the run and reports which jobs are undecided |
 | State | Saved after every tool call, so `--resume` continues an interrupted run without repeating decided jobs |
-| Tracing | JSON lines per model call (latency, tokens, stop reason) and per tool call (arguments, success, error) |
+| Free models | Refused. Free OpenRouter endpoints may train on or publish prompts, and the agent sends your profile and evidence bank. A run also stops if OpenRouter answers with a free model |
+| Tracing | Each model call prints which model answered (`Batch 1 step 2 answered by ...`) and the run ends with a count per model. JSON lines per model call (model that answered, latency, tokens, stop reason) and per tool call (arguments, success, error) |
 | Service | `serve.py`: `POST /runs`, `GET /runs/<id>`, `GET /health`; one run at a time; binds to 127.0.0.1 only |
 | Grounding | The prompt requires evidence to be quoted from the evidence bank; the evaluation measures how many quotes really are |
 

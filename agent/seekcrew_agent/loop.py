@@ -66,6 +66,7 @@ class RunState:
         self.reminders = 0
         self.stop = None
         self.batches_done = 0
+        self.models_used = {}      # model that actually answered -> number of calls
 
     def to_dict(self):
         return {k: v for k, v in self.__dict__.items() if k != "path"}
@@ -142,8 +143,10 @@ class Limits:
         return usage["input_tokens"] / 1e6 * self.price_in + usage["output_tokens"] / 1e6 * self.price_out
 
 
-def run(jobs, profile, evidence, model, limits=None, workspace=None, run_dir=None, resume=False, clock=time.monotonic):
-    """Screen `jobs` and return a summary dict. Writes state.json and trace.jsonl into run_dir if given."""
+def run(jobs, profile, evidence, model, limits=None, workspace=None, run_dir=None, resume=False, clock=time.monotonic,
+        show=None):
+    """Screen `jobs` and return a summary dict. Writes state.json and trace.jsonl into run_dir if given.
+    show: optional function called with one line of progress per model call (for example print)."""
     limits = limits or Limits()
     run_dir = Path(run_dir) if run_dir else None
     if run_dir:
@@ -178,13 +181,20 @@ def run(jobs, profile, evidence, model, limits=None, workspace=None, run_dir=Non
                 trace("model_error", error=str(e))
                 break
             u = resp.get("usage", {})
+            answered = resp.get("model") or getattr(model, "model", "?")
+            state.models_used[answered] = state.models_used.get(answered, 0) + 1
             state.usage["input_tokens"] += int(u.get("input_tokens", 0))
             state.usage["output_tokens"] += int(u.get("output_tokens", 0))
             state.usage["model_calls"] += 1
             if u.get("cost") is not None:  # real cost reported by the provider (OpenRouter)
                 state.usage["cost_reported"] = state.usage.get("cost_reported", 0.0) + float(u["cost"])
-            trace("model_call", step=step, ms=round((clock() - t0) * 1000), stop_reason=resp.get("stop_reason"),
+            ms = round((clock() - t0) * 1000)
+            trace("model_call", step=step, ms=ms, stop_reason=resp.get("stop_reason"), answered_by=answered,
                   input_tokens=u.get("input_tokens"), output_tokens=u.get("output_tokens"))
+            if show:
+                n_tools = sum(1 for c in resp.get("content", []) if c.get("type") == "tool_use")
+                show("Batch %d step %d answered by %s (%d tool call%s, %d ms)" % (
+                    state.batches_done + 1, step + 1, answered, n_tools, "" if n_tools == 1 else "s", ms))
             content = resp.get("content") or [{"type": "text", "text": "(no output)"}]
             messages.append({"role": "assistant", "content": content})
             calls = [c for c in content if c.get("type") == "tool_use"]
@@ -237,7 +247,7 @@ def run(jobs, profile, evidence, model, limits=None, workspace=None, run_dir=Non
         "run_id": state.run_id, "model": getattr(model, "model", "?"),
         "jobs": len(jobs), "decided": len(jobs) - len(undecided), "undecided": undecided,
         "relevant": sorted(i for i, d in state.decisions.items() if d["relevant"]),
-        "stop": state.stop or "completed",
+        "stop": state.stop or "completed", "models_used": dict(state.models_used),
         "usage": dict(state.usage), "cost_usd": limits.cost(state.usage),
         "tool_calls": dict(state.tool_calls), "tool_errors": dict(state.tool_errors),
         "tool_error_rate": round(sum(state.tool_errors.values()) / max(1, sum(state.tool_calls.values())), 4),
