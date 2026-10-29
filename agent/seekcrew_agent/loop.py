@@ -125,7 +125,7 @@ def batch_message(batch_jobs, digest):
 
 
 class Limits:
-    def __init__(self, batch_size=8, max_steps_per_batch=None, max_total_tokens=400_000,
+    def __init__(self, batch_size=8, max_steps_per_batch=None, max_total_tokens=3_000_000,
                  max_cost_usd=None, price_in_per_mtok=None, price_out_per_mtok=None, max_reminders=2):
         self.batch_size = batch_size
         self.max_steps_per_batch = max_steps_per_batch

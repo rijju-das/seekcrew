@@ -30,3 +30,6 @@ eval/boards.json
 eval/baseline_keywords.json
 .env
 eval/manual/
+
+# Evaluation reports: publish one deliberately with git add -f eval/results/<run>
+eval/results/

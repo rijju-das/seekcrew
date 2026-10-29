@@ -69,7 +69,7 @@ def main(argv=None):
     ap.add_argument("--model", default=os.environ.get("SEEKCREW_MODEL"))
     ap.add_argument("--out", default=str(REPO / "runs"))
     ap.add_argument("--batch-size", type=int, default=8)
-    ap.add_argument("--max-tokens-total", type=int, default=400_000)
+    ap.add_argument("--max-tokens-total", type=int, default=3_000_000, help="stop after this many input+output tokens (a safety net; --max-cost is the main limit)")
     ap.add_argument("--max-cost", type=float, default=None, help="stop when the estimated cost reaches this many US dollars")
     ap.add_argument("--price-in", type=float, default=None, help="input price, US$ per million tokens (from the pricing page)")
     ap.add_argument("--price-out", type=float, default=None, help="output price, US$ per million tokens")

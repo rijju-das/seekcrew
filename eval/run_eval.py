@@ -185,6 +185,7 @@ def main(argv=None):
     ap.add_argument("--model", default=None)
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--max-cost", type=float, default=None, help="cost cap per agent run, US$")
+    ap.add_argument("--max-tokens-total", type=int, default=3_000_000, help="token safety net per agent run")
     ap.add_argument("--price-in", type=float, default=None)
     ap.add_argument("--price-out", type=float, default=None)
     ap.add_argument("--profile", default=str(REPO / "PROFILE.md"))
@@ -230,7 +231,7 @@ def main(argv=None):
                     if not getattr(model, "reports_cost", False) and not isinstance(model, DryRunModel) and a.max_cost is not None and (a.price_in is None or a.price_out is None):
                         raise SystemExit("This provider does not report cost, so --max-cost needs --price-in and --price-out (US$ per million tokens)")
                     model_id = model.model
-                limits = Limits(batch_size=a.batch_size, max_cost_usd=a.max_cost,
+                limits = Limits(batch_size=a.batch_size, max_cost_usd=a.max_cost, max_total_tokens=a.max_tokens_total,
                                 price_in_per_mtok=a.price_in, price_out_per_mtok=a.price_out)
                 print("%s run %d: model requested %s" % (name, k + 1, model.model))
                 s = run(jobs, profile, evidence, model, limits, workspace=workspace,
