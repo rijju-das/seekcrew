@@ -306,10 +306,38 @@ class OpenRouter(Base):
         events = [json.loads(l) for l in (self.tmp / "run" / "trace.jsonl").read_text().splitlines()]
         self.assertEqual([e["answered_by"] for e in events if e["kind"] == "model_call"], ["vendor/model-a"] * 2)
 
+    def test_openai_provider_request_shape_and_quota_error(self):
+        sent, headers = [], []
+        replies = [self.oa_reply(content="hi", finish="stop")]
+
+        def opener(req, timeout):
+            sent.append(json.loads(req.data))
+            headers.append(dict(req.header_items()))
+            self.assertTrue(req.full_url.startswith("https://api.openai.com/v1/"))
+            return FakeResp(json.dumps(replies.pop(0)).encode())
+        m = OpenAICompatModel("gpt-x", api_key="k", provider="openai", opener=opener, sleep=lambda s: None)
+        m.create("s", [{"role": "user", "content": "x"}], [])
+        self.assertIn("max_completion_tokens", sent[0])
+        self.assertNotIn("max_tokens", sent[0])
+        self.assertNotIn("X-title", headers[0])
+        self.assertFalse(m.reports_cost)
+        quota = urllib.error.HTTPError("u", 429, "err", {}, io.BytesIO(b'{"error":{"message":"You exceeded your current quota","code":"insufficient_quota"}}'))
+
+        def opener2(req, timeout):
+            raise quota
+        m2 = OpenAICompatModel("gpt-x", api_key="k", provider="openai", opener=opener2, sleep=lambda s: None)
+        with self.assertRaises(ModelError) as cm:
+            m2.create("s", [{"role": "user", "content": "x"}], [])
+        self.assertIn("insufficient_quota", str(cm.exception))
+        self.assertEqual(m2.retries, 0)
+
     def test_provider_choice(self):
         import os
-        old = {k: os.environ.pop(k, None) for k in ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "SEEKCREW_PROVIDER")}
+        old = {k: os.environ.pop(k, None) for k in ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "SEEKCREW_PROVIDER")}
         try:
+            os.environ["OPENAI_API_KEY"] = "k"
+            m = make_model(None, "gpt-x")
+            self.assertEqual(m.provider, "openai")
             os.environ["OPENROUTER_API_KEY"] = "k"
             self.assertIsInstance(make_model(None, "a/b"), OpenAICompatModel)
             os.environ["ANTHROPIC_API_KEY"] = "k"

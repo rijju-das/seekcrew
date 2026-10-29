@@ -113,6 +113,8 @@ def text_reply(text, usage=(50, 10)):
 
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1"
+OPENAI_URL = "https://api.openai.com/v1"
+NO_RETRY_CODES = {"insufficient_quota", "credit_balance_exhausted", "billing_hard_limit_reached"}
 OPENAI_RETRY_STATUS = {408, 429, 500, 502, 503, 504}
 STOP_MAP = {"tool_calls": "tool_use", "stop": "end_turn", "length": "max_tokens"}
 
@@ -124,24 +126,33 @@ def is_free_model(model_id):
 
 
 class OpenAICompatModel:
-    """Chat Completions client for OpenRouter (or any OpenAI-compatible endpoint).
+    """Chat Completions client for OpenRouter or the OpenAI API (provider="openrouter" or "openai").
 
     The loop speaks the Anthropic message shape internally; this class translates requests
     and replies both ways, so the loop, tools and tests are the same for every provider.
     OpenRouter returns the real cost of each call in usage.cost; it is passed on as `cost`.
     """
 
-    def __init__(self, model, api_key=None, base_url=OPENROUTER_URL, max_tokens=4096, timeout=90,
-                 max_retries=4, opener=None, sleep=time.sleep, title="Seekcrew"):
+    def __init__(self, model, api_key=None, base_url=None, max_tokens=4096, timeout=90,
+                 max_retries=4, opener=None, sleep=time.sleep, title="Seekcrew", provider="openrouter"):
+        if provider not in ("openrouter", "openai"):
+            raise ModelError("Unknown Chat Completions provider %r" % provider)
+        self.provider = provider
+        self.name = "OpenRouter" if provider == "openrouter" else "the OpenAI API"
+        key_env = "OPENROUTER_API_KEY" if provider == "openrouter" else "OPENAI_API_KEY"
+        base_url = base_url or (OPENROUTER_URL if provider == "openrouter" else OPENAI_URL)
+        self.reports_cost = provider == "openrouter"
         if not model:
-            raise ModelError("No model ID. Set SEEKCREW_MODEL or pass --model (OpenRouter IDs look like provider/model, see openrouter.ai/models).")
-        if is_free_model(model):
+            raise ModelError("No model ID. Set SEEKCREW_MODEL or pass --model (%s)." % (
+                "OpenRouter IDs look like provider/model, see openrouter.ai/models" if provider == "openrouter"
+                else "an OpenAI model ID, see platform.openai.com/docs/models"))
+        if provider == "openrouter" and is_free_model(model):
             raise ModelError("Free models are not allowed: their providers may train on or publish prompts, and Seekcrew sends "
                              "your profile and evidence bank. Choose a paid model ID (without ':free').")
         self.model = model
-        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
+        self.api_key = api_key or os.environ.get(key_env)
         if not self.api_key:
-            raise ModelError("OPENROUTER_API_KEY is not set.")
+            raise ModelError("%s is not set." % key_env)
         self.url = base_url.rstrip("/") + "/chat/completions"
         self.max_tokens, self.timeout, self.max_retries = max_tokens, timeout, max_retries
         self._open = opener or urllib.request.urlopen
@@ -209,10 +220,13 @@ class OpenAICompatModel:
     # ---------------------------------------------------------------- call
     def create(self, system, messages, tools):
         oa_messages, oa_tools = self.to_openai(system, messages, tools)
-        body = json.dumps({"model": self.model, "max_tokens": self.max_tokens, "messages": oa_messages,
+        # OpenAI's newer models take max_completion_tokens; OpenRouter takes max_tokens
+        limit_key = "max_tokens" if self.provider == "openrouter" else "max_completion_tokens"
+        body = json.dumps({"model": self.model, limit_key: self.max_tokens, "messages": oa_messages,
                            "tools": oa_tools, "tool_choice": "auto"}).encode("utf-8")
-        headers = {"Authorization": "Bearer " + self.api_key, "Content-Type": "application/json",
-                   "X-Title": self.title}
+        headers = {"Authorization": "Bearer " + self.api_key, "Content-Type": "application/json"}
+        if self.provider == "openrouter":
+            headers["X-Title"] = self.title
         attempt = 0
         while True:
             req = urllib.request.Request(self.url, data=body, headers=headers, method="POST")
@@ -223,22 +237,23 @@ class OpenAICompatModel:
                 err = data.get("error") if isinstance(data, dict) else None
                 if not err:
                     out = self.from_openai(data)
-                    if is_free_model(out.get("model")):
+                    if self.provider == "openrouter" and is_free_model(out.get("model")):
                         raise ModelError("OpenRouter answered with a free model (%s). Stopped so your profile is not sent to free endpoints." % out["model"])
                     return out
                 code = err.get("code") if isinstance(err.get("code"), int) else 502
                 if code not in OPENAI_RETRY_STATUS or attempt >= self.max_retries:
                     raise ModelError("Provider error %s: %s" % (code, str(err.get("message", ""))[:300]))
             except urllib.error.HTTPError as e:
-                detail = _openai_error_text(e)
-                if e.code == 402:
-                    raise ModelError("HTTP 402 from OpenRouter: insufficient credits or a spending limit was reached. %s" % detail) from None
+                detail, code = _openai_error(e)
+                if e.code == 402 or code in NO_RETRY_CODES:
+                    raise ModelError("HTTP %s from %s: no credit left or a spending limit was reached (%s). %s" % (
+                        e.code, self.name, code or "credits", detail)) from None
                 if e.code not in OPENAI_RETRY_STATUS or attempt >= self.max_retries:
-                    raise ModelError("HTTP %s from OpenRouter: %s" % (e.code, detail)) from None
+                    raise ModelError("HTTP %s from %s: %s" % (e.code, self.name, detail)) from None
                 wait = _retry_after(e)
             except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
                 if attempt >= self.max_retries:
-                    raise ModelError("Network error calling OpenRouter: %s" % e) from None
+                    raise ModelError("Network error calling %s: %s" % (self.name, e)) from None
             if wait is None:
                 wait = min(30.0, 2.0 ** attempt + random.random())
             attempt += 1
@@ -246,22 +261,31 @@ class OpenAICompatModel:
             self._sleep(min(60.0, wait))
 
 
-def _openai_error_text(e):
+def _openai_error(e):
+    """(message, code) from an OpenAI-style error body."""
     try:
-        return str(json.loads(e.read().decode("utf-8")).get("error", {}).get("message", ""))[:300]
+        err = json.loads(e.read().decode("utf-8")).get("error", {}) or {}
+        return str(err.get("message", ""))[:300], str(err.get("code") or err.get("type") or "")
     except Exception:
-        return str(e)
+        return str(e), ""
     finally:
         e.close()
 
 
+def default_provider():
+    for env, name in (("OPENROUTER_API_KEY", "openrouter"), ("OPENAI_API_KEY", "openai"), ("ANTHROPIC_API_KEY", "anthropic")):
+        if os.environ.get(env):
+            return name
+    return "anthropic"
+
+
 def make_model(provider=None, model=None):
-    """Pick the provider: explicit, else SEEKCREW_PROVIDER, else openrouter if OPENROUTER_API_KEY is set, else anthropic."""
-    provider = (provider or os.environ.get("SEEKCREW_PROVIDER") or
-                ("openrouter" if os.environ.get("OPENROUTER_API_KEY") else "anthropic")).lower()
+    """Pick the provider: explicit, else SEEKCREW_PROVIDER, else by which key is set
+    (OPENROUTER_API_KEY, then OPENAI_API_KEY, then ANTHROPIC_API_KEY)."""
+    provider = (provider or os.environ.get("SEEKCREW_PROVIDER") or default_provider()).lower()
     model = model or os.environ.get("SEEKCREW_MODEL")
-    if provider == "openrouter":
-        return OpenAICompatModel(model)
+    if provider in ("openrouter", "openai"):
+        return OpenAICompatModel(model, provider=provider)
     if provider == "anthropic":
         return AnthropicModel(model)
-    raise ModelError("Unknown provider %r (use anthropic or openrouter)." % provider)
+    raise ModelError("Unknown provider %r (use openai, openrouter or anthropic)." % provider)

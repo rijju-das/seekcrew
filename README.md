@@ -17,7 +17,7 @@ It runs on your own computer, in your own Claude Code, on your own files. There 
 | `/job-sweep`, `/prepare-application` | Commands that run the agents in order |
 | `tools/app_tools.py` | Plain Python (standard library only): duplicate check, folder numbering, tracker rows with backup and rollback |
 | `dashboard/` | Optional local page that shows the agents at work |
-| `agent/` | The screening step written as a standalone agent: a tool-use loop on OpenRouter or the Anthropic API with batching, memory, error handling, budgets, tracing, resume and a local HTTP service (standard library only). See [agent/README.md](agent/README.md) |
+| `agent/` | The screening step written as a standalone agent: a tool-use loop on the OpenAI API, OpenRouter or the Anthropic API with batching, memory, error handling, budgets, tracing, resume and a local HTTP service (standard library only). See [agent/README.md](agent/README.md) |
 | `eval/` | Measures how well screening agrees with your own labels on a frozen sample of real adverts, against a keyword baseline: precision, recall, F1, fit agreement, cost, tool errors, grounding of evidence quotes and run-to-run stability. See [eval/README.md](eval/README.md) |
 
 ## Rules built into the agents
@@ -30,7 +30,7 @@ It runs on your own computer, in your own Claude Code, on your own files. There 
 
 - **Stored locally.** Your profile, evidence bank, CVs, application folders, shortlists, tracker and backups are plain files in this folder on your computer.
 - **Kept out of git.** `.gitignore` excludes those personal files, so they are not committed or pushed if you fork or share your copy. Run `git status` before every commit to check.
-- **Your own API key for `agent/`.** The standalone agent calls OpenRouter (`OPENROUTER_API_KEY`) or the Anthropic API (`ANTHROPIC_API_KEY`) with your key. With OpenRouter, the adverts, your profile and evidence bank go to OpenRouter and to the model provider it routes to, under their data policies; check the privacy settings in your OpenRouter account. Never put the key in a file in this folder. Run folders (`runs/`) and evaluation data (`eval/data/`) are git-ignored.
+- **Your own API key for `agent/`.** The standalone agent calls the OpenAI API (`OPENAI_API_KEY`), OpenRouter (`OPENROUTER_API_KEY`) or the Anthropic API (`ANTHROPIC_API_KEY`) with your key; your profile, evidence bank and the adverts go to that provider under its data policy. With OpenRouter, the adverts, your profile and evidence bank go to OpenRouter and to the model provider it routes to, under their data policies; check the privacy settings in your OpenRouter account. Never put the key in a file in this folder. Run folders (`runs/`) and evaluation data (`eval/data/`) are git-ignored.
 - **No server, account, database or analytics.** Seekcrew has none of these. The optional dashboard listens on `127.0.0.1` only, so other machines cannot open it.
 - **What does leave your computer.** When the agents work, Claude Code sends the files they read (for example your CV and profile) and the job texts to Anthropic for processing, as in any Claude Code session, under your Claude plan's terms. The job-scout agent also runs web searches and opens job pages.
 - **Nothing is sent for you.** The agents never submit applications, send emails or messages, or fill in forms. You review every document and apply yourself.

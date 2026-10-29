@@ -6,6 +6,10 @@
     export SEEKCREW_MODEL=<provider/model>  # an ID from openrouter.ai/models
     python3 agent/cli.py --jobs eval/data/adverts.jsonl --max-cost 2
 
+    # OpenAI API (for example with the API credits of a ChatGPT Pro plan); cost is estimated from prices
+    export OPENAI_API_KEY=... SEEKCREW_MODEL=<OpenAI model id>
+    python3 agent/cli.py --provider openai --jobs eval/data/adverts.jsonl --max-cost 2 --price-in <$/MTok> --price-out <$/MTok>
+
     # Anthropic API directly
     export ANTHROPIC_API_KEY=... SEEKCREW_MODEL=<model id>
     python3 agent/cli.py --provider anthropic --jobs eval/data/adverts.jsonl --max-cost 2 --price-in <$/MTok> --price-out <$/MTok>
@@ -33,7 +37,13 @@ from seekcrew_agent.dry import DryRunModel  # noqa: E402
 
 
 def load_jobs(path):
-    jobs = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+    jobs = []
+    for n, line in enumerate(Path(path).read_text().splitlines(), 1):
+        if line.strip():
+            try:
+                jobs.append(json.loads(line))
+            except json.JSONDecodeError:
+                raise SystemExit("%s line %d is not valid JSON. The jobs file needs one JSON object per line." % (path, n))
     for j in jobs:
         for k in ("id", "company", "title"):
             if not j.get(k):
@@ -55,7 +65,7 @@ def main(argv=None):
     ap.add_argument("--profile", default=str(REPO / "PROFILE.md"))
     ap.add_argument("--evidence", default=str(REPO / "EVIDENCE_BANK.md"))
     ap.add_argument("--workspace", default=str(REPO), help="folder whose applications/ and tracker.csv the duplicate check uses")
-    ap.add_argument("--provider", default=None, help="openrouter or anthropic (default: openrouter if OPENROUTER_API_KEY is set)")
+    ap.add_argument("--provider", default=None, help="openai, openrouter or anthropic (default: chosen by which API key is set)")
     ap.add_argument("--model", default=os.environ.get("SEEKCREW_MODEL"))
     ap.add_argument("--out", default=str(REPO / "runs"))
     ap.add_argument("--batch-size", type=int, default=8)
@@ -83,8 +93,8 @@ def main(argv=None):
         model = DryRunModel(**dry_settings()) if a.dry_run else make_model(a.provider, a.model)
     except ModelError as e:
         raise SystemExit(str(e))
-    if isinstance(model, AnthropicModel) and a.max_cost is not None and (a.price_in is None or a.price_out is None):
-        raise SystemExit("With the Anthropic API, --max-cost needs --price-in and --price-out so the cost can be estimated.")
+    if not getattr(model, "reports_cost", False) and not isinstance(model, DryRunModel) and a.max_cost is not None and (a.price_in is None or a.price_out is None):
+        raise SystemExit("This provider does not report cost, so --max-cost needs --price-in and --price-out (US$ per million tokens) to estimate it.")
     if not run_dir:
         stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
         run_dir = Path(a.out) / ("%s_%s" % (stamp, "dry" if a.dry_run else "agent"))
@@ -93,7 +103,7 @@ def main(argv=None):
                                                        "batch_size": a.batch_size, "dry_run": a.dry_run}, indent=1))
     limits = Limits(batch_size=a.batch_size, max_total_tokens=a.max_tokens_total, max_cost_usd=a.max_cost,
                     price_in_per_mtok=a.price_in, price_out_per_mtok=a.price_out)
-    print("Model requested: %s" % model.model)
+    print("Provider: %s. Model requested: %s" % (getattr(model, "provider", "anthropic" if isinstance(model, AnthropicModel) else "dry-run"), model.model))
     s = run(jobs, profile, evidence, model, limits, workspace=a.workspace, run_dir=run_dir, resume=bool(a.resume), show=print)
     label = "cost" if s["usage"].get("cost_reported") is not None else "est. cost"
     cost = "" if s["cost_usd"] is None else ", %s $%.4f" % (label, s["cost_usd"])

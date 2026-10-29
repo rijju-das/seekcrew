@@ -1,6 +1,6 @@
 # Seekcrew agent
 
-The screening step of Seekcrew written as a standalone agent: Python code that calls a model API with tools (OpenRouter or the Anthropic API), rather than prompts running inside Claude Code. It reads job adverts, decides which belong on your shortlist, gives each a fit score from 1 to 5 with evidence quoted from your evidence bank, and checks duplicates against your tracker. Standard library only.
+The screening step of Seekcrew written as a standalone agent: Python code that calls a model API with tools (the OpenAI API, OpenRouter or the Anthropic API), rather than prompts running inside Claude Code. It reads job adverts, decides which belong on your shortlist, gives each a fit score from 1 to 5 with evidence quoted from your evidence bank, and checks duplicates against your tracker. Standard library only.
 
 ## Run it
 
@@ -9,6 +9,12 @@ The screening step of Seekcrew written as a standalone agent: Python code that c
 export OPENROUTER_API_KEY=...         # from openrouter.ai/keys; set a credit limit on the key
 export SEEKCREW_MODEL=<provider/model>  # an ID from openrouter.ai/models that supports tool calling
 python3 agent/cli.py --jobs eval/data/adverts.jsonl --max-cost 2
+
+# Or the OpenAI API (for example with the monthly API credits included in a ChatGPT Pro plan)
+export OPENAI_API_KEY=...             # from platform.openai.com/api-keys
+export SEEKCREW_MODEL=<OpenAI model id>
+python3 agent/cli.py --provider openai --jobs eval/data/adverts.jsonl \
+    --max-cost 2 --price-in <US$ per M input tokens> --price-out <US$ per M output tokens>
 
 # Or the Anthropic API directly (cost is estimated from the prices you pass)
 export ANTHROPIC_API_KEY=... SEEKCREW_MODEL=<model id>
@@ -32,7 +38,7 @@ adverts ─► batches of 8 ─► per batch: fresh conversation ─► model �
 
 | Concern | How it is handled |
 |---|---|
-| Providers | The loop works with one internal message format. `AnthropicModel` speaks the Messages API; `OpenAICompatModel` translates to and from Chat Completions for OpenRouter (tool calls, tool results, errors, usage and reported cost) |
+| Providers | The loop works with one internal message format. `AnthropicModel` speaks the Messages API; `OpenAICompatModel` translates to and from Chat Completions for OpenRouter and the OpenAI API (tool calls, tool results, errors, usage; OpenRouter's reported cost). Quota and credit errors stop the run instead of being retried |
 | Tools | `list_jobs`, `read_job`, `check_duplicate` (the same checker as the Claude Code agents), `record_decision`, `finish`, each with a JSON schema |
 | Validation | Tool inputs are checked (job in batch, fit 1-5, types, sizes). A bad call returns an error result (`is_error`) so the model can correct itself; the failure is counted |
 | Planning | The model decides per job whether the title is enough or the full advert must be read; `finish` is refused while any job in the batch is undecided |
@@ -49,6 +55,6 @@ adverts ─► batches of 8 ─► per batch: fresh conversation ─► model �
 
 - It screens adverts you give it; it does not search the web. Collecting adverts is `eval/collect.py` (public job-board APIs) or your own file.
 - The prompt and tools are a first version. Use `eval/` to measure them before trusting the decisions, and compare against the keyword baseline.
-- With OpenRouter the cost comes from its usage reports; with the Anthropic API it is estimated from the prices you pass. Check real spend in your provider's dashboard.
+- With OpenRouter the cost comes from its usage reports; with the OpenAI and Anthropic APIs it is estimated from the prices you pass. Check real spend in your provider's dashboard.
 - Tool calling quality differs a lot between models. Pick a model that lists tool support on OpenRouter, and compare models with `eval/`.
 - The dry-run model is a keyword rule. Its results are a baseline, not an agent result.

@@ -180,7 +180,7 @@ def main(argv=None):
     ap.add_argument("--systems", default="baseline,dry")
     ap.add_argument("--import", dest="imports", action="append", default=[], help="NAME=decisions.json")
     ap.add_argument("--repeats", type=int, default=3)
-    ap.add_argument("--provider", default=None, help="openrouter or anthropic")
+    ap.add_argument("--provider", default=None, help="openai, openrouter or anthropic")
     ap.add_argument("--model", default=None)
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--max-cost", type=float, default=None, help="cost cap per agent run, US$")
@@ -226,8 +226,8 @@ def main(argv=None):
                         model = make_model(a.provider, a.model)
                     except ModelError as e:
                         raise SystemExit(str(e))
-                    if isinstance(model, AnthropicModel) and a.max_cost is not None and (a.price_in is None or a.price_out is None):
-                        raise SystemExit("With the Anthropic API, --max-cost needs --price-in and --price-out")
+                    if not getattr(model, "reports_cost", False) and not isinstance(model, DryRunModel) and a.max_cost is not None and (a.price_in is None or a.price_out is None):
+                        raise SystemExit("This provider does not report cost, so --max-cost needs --price-in and --price-out (US$ per million tokens)")
                     model_id = model.model
                 limits = Limits(batch_size=a.batch_size, max_cost_usd=a.max_cost,
                                 price_in_per_mtok=a.price_in, price_out_per_mtok=a.price_out)

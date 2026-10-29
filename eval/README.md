@@ -41,7 +41,7 @@ How often does a screening system agree with your own judgement about which jobs
    python3 eval/run_eval.py --systems baseline,agent --repeats 3 --max-cost 2
    ```
 
-   `--max-cost` caps each run, using the cost OpenRouter reports. Start with `--repeats 1` to see the cost of one run. To compare models, run it once per model (change `SEEKCREW_MODEL`). With the Anthropic API instead, add `--provider anthropic --price-in <US$/M> --price-out <US$/M>`.
+   `--max-cost` caps each run, using the cost OpenRouter reports. Start with `--repeats 1` to see the cost of one run. To compare models, run it once per model (change `SEEKCREW_MODEL`). With the OpenAI API (`OPENAI_API_KEY`) or the Anthropic API instead, add `--provider openai` or `--provider anthropic`, plus `--price-in <US$/M> --price-out <US$/M>` so the cost cap can estimate spend.
 
 5. **Compare other systems** by exporting their decisions as `{"job_id": {"relevant": true, "fit": 4}}` and adding `--import name=file.json` (for example the Claude Code job-scout's decisions on the same adverts).
 

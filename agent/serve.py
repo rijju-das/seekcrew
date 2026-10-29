@@ -141,8 +141,8 @@ def main(argv=None):
             first = make_model(a.provider, a.model)  # fail fast on a missing key or model
         except ModelError as e:
             raise SystemExit(str(e))
-        if isinstance(first, AnthropicModel) and a.max_cost is not None and (a.price_in is None or a.price_out is None):
-            raise SystemExit("With the Anthropic API, --max-cost needs --price-in and --price-out")
+        if not getattr(first, "reports_cost", False) and a.max_cost is not None and (a.price_in is None or a.price_out is None):
+            raise SystemExit("This provider does not report cost, so --max-cost needs --price-in and --price-out (US$ per million tokens)")
         build = make_model
         make_model = lambda: build(a.provider, a.model)  # noqa: E731
     for p in (a.profile, a.evidence):
