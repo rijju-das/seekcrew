@@ -74,6 +74,29 @@ python3 -m unittest discover -s tests -v
 
 The duplicate-check suite covers folder numbering, refusals, forcing, the tracker (new file, permanent IDs, existing rows unchanged, backup, rollback on a failed write, invalid values rejected) and 12 labelled duplicate cases. The labelled set is small, written by the author with fictional employers and roles, and not independent, so treat the 100% it prints as a regression check, not as a measured accuracy on real postings. Add your own cases to `tests/labelled_pairs.json` when the check gets one wrong.
 
+## Evaluation results (October 2026)
+
+The standalone agent (`agent/`) was evaluated on the author's own job search with the harness in `eval/`: 60 adverts sampled with a fixed seed from public Greenhouse and Ashby boards (about half chosen by titles in the author's field), labelled for relevance and fit (1-5). 7 of the 60 are labelled relevant. The adverts and labels are private, so these exact numbers cannot be reproduced; run the harness on your own search instead.
+
+| Configuration | Runs | Precision | Recall | F1 (95% CI, run 1) | Fit within 1 | Fit weighted kappa | Run-to-run agreement | Grounded quotes | Cost per run |
+|---|---|---|---|---|---|---|---|---|---|
+| Keyword baseline (title keywords) | 1 | 0.67 | 0.86 | 0.75 (0.43 to 0.95) | 0.97 | 0.67 | n/a | n/a | free |
+| Claude Haiku 5.5, agent 0.1.0, profile v1 | 1 | 1.00 | 0.57 | 0.73 (0.29 to 1.00) | 0.97 | 0.75 | n/a | 0.88 | $0.06 |
+| Claude Haiku 5.5, agent 0.2.0, profile v1 | 1 | 1.00 | 0.57 | 0.73 (0.29 to 1.00) | 0.97 | 0.75 | n/a | 1.00 | $0.06 |
+| GPT-6.1 Terra, agent 0.2.0, profile v1 | 3 | 1.00 | 0.29 | 0.44 (0.00 to 0.80) | 0.97 | 0.61 | 1.00 | 1.00 | $0.10 |
+| Claude Haiku 5.5, agent 0.2.0, profile v2 | 3 | 1.00 | 0.57 | 0.73 (0.29 to 1.00) | 0.97 | 0.73 | 0.98 | 1.00 | $0.06 |
+| **GPT-6.1 Terra, agent 0.2.0, profile v2** | 3 | **1.00** | **0.76 ± 0.16** | **0.86 ± 0.11** (0.67 to 1.00) | 0.97 | 0.70 | 0.98 | 1.00 | $0.10 |
+
+Models were called through OpenRouter. Reports: [`eval/results/`](eval/results/) (the agent 0.1.0 run's files were lost; its figures come from the report as first read).
+
+What the evaluation found and what changed:
+
+- **Evidence copied from adverts.** Agent 0.1.0 put 2 of 17 "evidence" quotes from the advert's requirements instead of the evidence bank. Agent 0.2.0 tells the model that advert text is never evidence and refuses any quote not found in the evidence bank. Grounding went from 88% to 100%; no quote needed refusing in later runs, so the prompt change did the work and the check is a safety net.
+- **An underspecified profile.** With profile v1, GPT-6.1 Terra rejected every Data Scientist role (recall 0.29) while the labels counted them, because the profile did not say whether they count. Profile v2 states that Data Scientist roles centred on applied ML, LLM applications or model evaluation count, and recall rose to 0.76. Most disagreement came from the instructions, not the model's reasoning.
+- **Behaviour.** Both models were cautious: precision 1.00 in every run. About one decision in 60 changed between repeated runs. The harness completed all 11 runs with every advert decided; Claude Haiku sent malformed tool arguments 1-2 times per run and recovered each time.
+
+Limits of these results: one person's job search; only 7 relevant adverts, so intervals are wide and the agent's F1 is not significantly better than the baseline's; the labels were drafted by an LLM and confirmed by the author, which can favour LLM agents; the sample over-represents titles in the author's field, which helps the keyword baseline; one labelled-relevant advert has ambiguous eligibility wording, and all 11 runs rejected it.
+
 ## Limits
 
 - It does not guarantee a job, an interview or that a listing is still open. Results are a snapshot.

@@ -1,0 +1,235 @@
+{
+ "meta": {
+  "date": "2026-10-30_005601",
+  "labelled": 60,
+  "skipped": 0,
+  "positives": 7,
+  "sources": {
+   "greenhouse": [
+    47,
+    6
+   ],
+   "ashby": [
+    13,
+    1
+   ]
+  },
+  "model": "openai/gpt-6.1-terra",
+  "repeats": 3,
+  "batch_size": 8
+ },
+ "systems": {
+  "baseline": {
+   "runs": [
+    {
+     "n": 60,
+     "coverage": 1.0,
+     "tp": 6,
+     "fp": 3,
+     "fn": 1,
+     "tn": 50,
+     "precision": 0.6666666666666666,
+     "recall": 0.8571428571428571,
+     "f1": 0.75,
+     "accuracy": 0.9333333333333333,
+     "f1_ci95": [
+      0.42857142857142855,
+      0.9473684210526316
+     ],
+     "fit": {
+      "n": 60,
+      "mae": 0.36666666666666664,
+      "exact": 0.6666666666666666,
+      "within_1": 0.9666666666666667,
+      "spearman": 0.6821916494224974,
+      "qwk": 0.6737766624843162
+     }
+    }
+   ]
+  },
+  "agent": {
+   "runs": [
+    {
+     "n": 60,
+     "coverage": 1.0,
+     "tp": 2,
+     "fp": 0,
+     "fn": 5,
+     "tn": 53,
+     "precision": 1.0,
+     "recall": 0.2857142857142857,
+     "f1": 0.4444444444444445,
+     "accuracy": 0.9166666666666666,
+     "f1_ci95": [
+      0.0,
+      0.8
+     ],
+     "fit": {
+      "n": 60,
+      "mae": 0.26666666666666666,
+      "exact": 0.7833333333333333,
+      "within_1": 0.9666666666666667,
+      "spearman": 0.7081343873010467,
+      "qwk": 0.6160000000000001
+     },
+     "evidence": {
+      "quotes": 32,
+      "grounded": 1.0
+     }
+    },
+    {
+     "n": 60,
+     "coverage": 1.0,
+     "tp": 2,
+     "fp": 0,
+     "fn": 5,
+     "tn": 53,
+     "precision": 1.0,
+     "recall": 0.2857142857142857,
+     "f1": 0.4444444444444445,
+     "accuracy": 0.9166666666666666,
+     "f1_ci95": [
+      0.0,
+      0.8
+     ],
+     "fit": {
+      "n": 60,
+      "mae": 0.25,
+      "exact": 0.7833333333333333,
+      "within_1": 0.9833333333333333,
+      "spearman": 0.7562726623192665,
+      "qwk": 0.6638207043756671
+     },
+     "evidence": {
+      "quotes": 34,
+      "grounded": 1.0
+     }
+    },
+    {
+     "n": 60,
+     "coverage": 1.0,
+     "tp": 2,
+     "fp": 0,
+     "fn": 5,
+     "tn": 53,
+     "precision": 1.0,
+     "recall": 0.2857142857142857,
+     "f1": 0.4444444444444445,
+     "accuracy": 0.9166666666666666,
+     "f1_ci95": [
+      0.0,
+      0.8
+     ],
+     "fit": {
+      "n": 60,
+      "mae": 0.3,
+      "exact": 0.7666666666666667,
+      "within_1": 0.95,
+      "spearman": 0.6358766934631851,
+      "qwk": 0.552477357485349
+     },
+     "evidence": {
+      "quotes": 34,
+      "grounded": 1.0
+     }
+    }
+   ],
+   "process": [
+    {
+     "agent_version": "0.2.0",
+     "ungrounded_rejected": 0,
+     "models_used": {
+      "openai/gpt-6.1-terra": 28
+     },
+     "usage": {
+      "input_tokens": 192381,
+      "output_tokens": 7622,
+      "model_calls": 28,
+      "cost_reported": 0.10323085000000001
+     },
+     "cost_usd": 0.10323085000000001,
+     "seconds": 149.79,
+     "tool_error_rate": 0.0,
+     "tool_calls": {
+      "list_jobs": 4,
+      "read_job": 24,
+      "record_decision": 60,
+      "finish": 8,
+      "check_duplicate": 2
+     },
+     "tool_errors": {},
+     "reads": 24,
+     "jobs_read": 24,
+     "reminders": 0,
+     "revisions": 0,
+     "model_retries": 0,
+     "stop": "completed",
+     "undecided": []
+    },
+    {
+     "agent_version": "0.2.0",
+     "ungrounded_rejected": 0,
+     "models_used": {
+      "openai/gpt-6.1-terra": 28
+     },
+     "usage": {
+      "input_tokens": 195178,
+      "output_tokens": 7706,
+      "model_calls": 28,
+      "cost_reported": 0.09371909999999999
+     },
+     "cost_usd": 0.09371909999999999,
+     "seconds": 148.03,
+     "tool_error_rate": 0.0,
+     "tool_calls": {
+      "list_jobs": 5,
+      "read_job": 25,
+      "record_decision": 60,
+      "finish": 8,
+      "check_duplicate": 2
+     },
+     "tool_errors": {},
+     "reads": 25,
+     "jobs_read": 25,
+     "reminders": 0,
+     "revisions": 0,
+     "model_retries": 0,
+     "stop": "completed",
+     "undecided": []
+    },
+    {
+     "agent_version": "0.2.0",
+     "ungrounded_rejected": 0,
+     "models_used": {
+      "openai/gpt-6.1-terra": 29
+     },
+     "usage": {
+      "input_tokens": 202732,
+      "output_tokens": 7656,
+      "model_calls": 29,
+      "cost_reported": 0.09395645000000001
+     },
+     "cost_usd": 0.09395645000000001,
+     "seconds": 152.5,
+     "tool_error_rate": 0.0,
+     "tool_calls": {
+      "list_jobs": 7,
+      "read_job": 26,
+      "record_decision": 60,
+      "finish": 8,
+      "check_duplicate": 2
+     },
+     "tool_errors": {},
+     "reads": 26,
+     "jobs_read": 26,
+     "reminders": 0,
+     "revisions": 0,
+     "model_retries": 0,
+     "stop": "completed",
+     "undecided": []
+    }
+   ],
+   "stability": 1.0
+  }
+ }
+}

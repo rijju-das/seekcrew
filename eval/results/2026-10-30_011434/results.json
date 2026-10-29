@@ -1,0 +1,243 @@
+{
+ "meta": {
+  "profile_sha256": "8700e869cd",
+  "evidence_sha256": "f4c06aed35",
+  "labels_sha256": "baea00c086",
+  "date": "2026-10-30_011434",
+  "labelled": 60,
+  "skipped": 0,
+  "positives": 7,
+  "sources": {
+   "greenhouse": [
+    47,
+    6
+   ],
+   "ashby": [
+    13,
+    1
+   ]
+  },
+  "model": "anthropic/claude-haiku-5.5",
+  "repeats": 3,
+  "batch_size": 8
+ },
+ "systems": {
+  "baseline": {
+   "runs": [
+    {
+     "n": 60,
+     "coverage": 1.0,
+     "tp": 6,
+     "fp": 3,
+     "fn": 1,
+     "tn": 50,
+     "precision": 0.6666666666666666,
+     "recall": 0.8571428571428571,
+     "f1": 0.75,
+     "accuracy": 0.9333333333333333,
+     "f1_ci95": [
+      0.42857142857142855,
+      0.9473684210526316
+     ],
+     "fit": {
+      "n": 60,
+      "mae": 0.36666666666666664,
+      "exact": 0.6666666666666666,
+      "within_1": 0.9666666666666667,
+      "spearman": 0.6821916494224974,
+      "qwk": 0.6737766624843162
+     }
+    }
+   ]
+  },
+  "agent": {
+   "runs": [
+    {
+     "n": 60,
+     "coverage": 1.0,
+     "tp": 4,
+     "fp": 0,
+     "fn": 3,
+     "tn": 53,
+     "precision": 1.0,
+     "recall": 0.5714285714285714,
+     "f1": 0.7272727272727273,
+     "accuracy": 0.95,
+     "f1_ci95": [
+      0.2857142857142857,
+      1.0
+     ],
+     "fit": {
+      "n": 60,
+      "mae": 0.23333333333333334,
+      "exact": 0.8,
+      "within_1": 0.9666666666666667,
+      "spearman": 0.7663736966298623,
+      "qwk": 0.7367137981472452
+     },
+     "evidence": {
+      "quotes": 17,
+      "grounded": 1.0
+     }
+    },
+    {
+     "n": 60,
+     "coverage": 1.0,
+     "tp": 4,
+     "fp": 0,
+     "fn": 3,
+     "tn": 53,
+     "precision": 1.0,
+     "recall": 0.5714285714285714,
+     "f1": 0.7272727272727273,
+     "accuracy": 0.95,
+     "f1_ci95": [
+      0.2857142857142857,
+      1.0
+     ],
+     "fit": {
+      "n": 60,
+      "mae": 0.23333333333333334,
+      "exact": 0.8,
+      "within_1": 0.9666666666666667,
+      "spearman": 0.788028100774474,
+      "qwk": 0.7203521491455205
+     },
+     "evidence": {
+      "quotes": 15,
+      "grounded": 1.0
+     }
+    },
+    {
+     "n": 60,
+     "coverage": 1.0,
+     "tp": 4,
+     "fp": 0,
+     "fn": 3,
+     "tn": 53,
+     "precision": 1.0,
+     "recall": 0.5714285714285714,
+     "f1": 0.7272727272727273,
+     "accuracy": 0.95,
+     "f1_ci95": [
+      0.2857142857142857,
+      1.0
+     ],
+     "fit": {
+      "n": 60,
+      "mae": 0.23333333333333334,
+      "exact": 0.8,
+      "within_1": 0.9666666666666667,
+      "spearman": 0.749919243539367,
+      "qwk": 0.7364568081991214
+     },
+     "evidence": {
+      "quotes": 15,
+      "grounded": 1.0
+     }
+    }
+   ],
+   "process": [
+    {
+     "agent_version": "0.2.0",
+     "ungrounded_rejected": 0,
+     "models_used": {
+      "anthropic/claude-haiku-5.5": 31
+     },
+     "usage": {
+      "input_tokens": 404644,
+      "output_tokens": 40608,
+      "model_calls": 31,
+      "cost_reported": 0.0607684
+     },
+     "cost_usd": 0.0607684,
+     "seconds": 207.64,
+     "tool_error_rate": 0.0099,
+     "tool_calls": {
+      "list_jobs": 3,
+      "read_job": 23,
+      "record_decision": 61,
+      "finish": 8,
+      "check_duplicate": 6
+     },
+     "tool_errors": {
+      "record_decision": 1
+     },
+     "reads": 23,
+     "jobs_read": 23,
+     "reminders": 0,
+     "revisions": 0,
+     "model_retries": 0,
+     "stop": "completed",
+     "undecided": []
+    },
+    {
+     "agent_version": "0.2.0",
+     "ungrounded_rejected": 0,
+     "models_used": {
+      "anthropic/claude-haiku-5.5": 28
+     },
+     "usage": {
+      "input_tokens": 371364,
+      "output_tokens": 39759,
+      "model_calls": 28,
+      "cost_reported": 0.0570159
+     },
+     "cost_usd": 0.0570159,
+     "seconds": 191.94,
+     "tool_error_rate": 0.0194,
+     "tool_calls": {
+      "read_job": 24,
+      "check_duplicate": 6,
+      "record_decision": 64,
+      "finish": 8,
+      "list_jobs": 1
+     },
+     "tool_errors": {
+      "record_decision": 2
+     },
+     "reads": 24,
+     "jobs_read": 24,
+     "reminders": 0,
+     "revisions": 2,
+     "model_retries": 0,
+     "stop": "completed",
+     "undecided": []
+    },
+    {
+     "agent_version": "0.2.0",
+     "ungrounded_rejected": 0,
+     "models_used": {
+      "anthropic/claude-haiku-5.5": 29
+     },
+     "usage": {
+      "input_tokens": 386539,
+      "output_tokens": 39738,
+      "model_calls": 29,
+      "cost_reported": 0.0585229
+     },
+     "cost_usd": 0.0585229,
+     "seconds": 195.48,
+     "tool_error_rate": 0.0204,
+     "tool_calls": {
+      "read_job": 24,
+      "record_decision": 62,
+      "finish": 8,
+      "check_duplicate": 4
+     },
+     "tool_errors": {
+      "record_decision": 2
+     },
+     "reads": 24,
+     "jobs_read": 24,
+     "reminders": 0,
+     "revisions": 0,
+     "model_retries": 0,
+     "stop": "completed",
+     "undecided": []
+    }
+   ],
+   "stability": 0.9777777777777779
+  }
+ }
+}
